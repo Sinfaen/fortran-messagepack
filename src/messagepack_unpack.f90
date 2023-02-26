@@ -1,6 +1,7 @@
 module messagepack_unpack
     use iso_fortran_env
     use,intrinsic :: ieee_arithmetic
+    use byte_utilities
     use messagepack_value
 
     implicit none
@@ -8,29 +9,8 @@ module messagepack_unpack
     private
 
     public :: unpack_stream
-    public :: detect_little_endian
-    public :: print_endianness
-    public :: bytes_be_int_le_2, bytes_be_int_le_4, bytes_be_int_le_8
-    public :: bytes_be_int_be_2, bytes_be_int_be_4, bytes_be_int_be_8
-    public :: bytes_be_to_int_2, bytes_be_to_int_4, bytes_be_to_int_8
 
     contains
-        logical function detect_little_endian()
-            ! used by the library to detect host endianness
-            ! Note: DOES NOT HANDLE MIDDLE-ENDIAN
-            ! @returns .true. if little endian, .false. otherwise
-            detect_little_endian = (1 == transfer([1_int8, 0_int8], 0_int16) )
-        end function
-
-        subroutine print_endianness()
-            ! debugging function to print out whether the library
-            ! thinks the host system is little or big endian
-            if (detect_little_endian()) then
-                print *, "Detected System Endianness: Little"
-            else
-                print *, "Detected System Endiannes: Big"
-            end if
-        end subroutine
 
         logical function check_length_and_print(need, actual)
             integer, intent(in) :: need
@@ -187,83 +167,8 @@ module messagepack_unpack
             case (MP_M32)
             case (MP_NFI_L:MP_NFI_H)
                 ! take the first 5 bits, create a negative value from it
-                btemp1 = 0
-                call mvbits(buffer(1), 0, 5, btemp1, 0)
+                btemp1 = ibits(buffer(1), 0, 5)
                 mpv = mp_int_type(-btemp1)
             end select
         end subroutine
-
-        integer(kind=int16) function bytes_be_int_le_2(bytes)
-            ! converts bytes in big-endian to an int16 in little endian
-            byte, dimension(2), intent(in) :: bytes
-            bytes_be_int_le_2 = transfer([bytes(2), bytes(1)], 0_int16)
-        end function
-
-        integer(kind=int32) function bytes_be_int_le_4(bytes)
-        ! converts bytes in big-endian to an int32 in little endian
-            byte, dimension(4), intent(in) :: bytes
-            bytes_be_int_le_4 = transfer([bytes(4), bytes(3), bytes(2), bytes(1)], 0_int32)
-        end function
-
-        integer(kind=int64) function bytes_be_int_le_8(bytes)
-        ! converts bytes in big-endian to an int64 in little endian
-            byte, dimension(8), intent(in) :: bytes
-            bytes_be_int_le_8 = transfer([bytes(8), bytes(7), bytes(6), bytes(5), &
-                bytes(4), bytes(3), bytes(2), bytes(1)], 0_int64)
-        end function
-
-        integer(kind=int16) function bytes_be_int_be_2(bytes)
-            ! converts bytes in big-endian to an int16 in big endian
-            byte, dimension(2), intent(in) :: bytes
-            bytes_be_int_be_2 = transfer([bytes(1), bytes(2)], 0_int16)
-        end function
-
-        integer(kind=int32) function bytes_be_int_be_4(bytes)
-        ! converts bytes in big-endian to an int32 in little endian
-            byte, dimension(4), intent(in) :: bytes
-            bytes_be_int_be_4 = transfer([bytes(1), bytes(2), bytes(3), bytes(4)], 0_int32)
-        end function
-
-        integer(kind=int64) function bytes_be_int_be_8(bytes)
-        ! converts bytes in big-endian to an int64 in little endian
-            byte, dimension(8), intent(in) :: bytes
-            bytes_be_int_be_8 = transfer([bytes(1), bytes(2), bytes(3), bytes(4), &
-                bytes(5), bytes(6), bytes(7), bytes(8)], 0_int64)
-        end function
-
-        integer(kind=int16) function bytes_be_to_int_2(bytes, e)
-        ! converts bytes in big-endian to an int16 based on requested endianness
-        ! @param[in] e - .true. for little endian, .false. for big endian
-            byte, dimension(2), intent(in) :: bytes
-            logical, intent(in) :: e
-            if (e) then
-                bytes_be_to_int_2 = bytes_be_int_le_2(bytes)
-            else
-                bytes_be_to_int_2 = bytes_be_int_be_2(bytes)
-            end if
-        end function
-
-        integer(kind=int32) function bytes_be_to_int_4(bytes, e)
-        ! converts bytes in big-endian to an int16 based on requested endianness
-        ! @param[in] e - .true. for little endian, .false. for big endian
-            byte, dimension(4), intent(in) :: bytes
-            logical, intent(in) :: e
-            if (e) then
-                bytes_be_to_int_4 = bytes_be_int_le_4(bytes)
-            else
-                bytes_be_to_int_4 = bytes_be_int_be_4(bytes)
-            end if
-        end function
-
-        integer(kind=int64) function bytes_be_to_int_8(bytes, e)
-        ! converts bytes in big-endian to an int16 based on requested endianness
-        ! @param[in] e - .true. for little endian, .false. for big endian
-            byte, dimension(8), intent(in) :: bytes
-            logical, intent(in) :: e
-            if (e) then
-                bytes_be_to_int_8 = bytes_be_int_le_8(bytes)
-            else
-                bytes_be_to_int_8 = bytes_be_int_be_8(bytes)
-            end if
-        end function
 end module

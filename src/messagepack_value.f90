@@ -1,6 +1,7 @@
 module messagepack_value
     use iso_fortran_env
     use,intrinsic :: ieee_arithmetic
+    use byte_utilities
 
     implicit none
 
@@ -92,6 +93,7 @@ module messagepack_value
         logical :: signed = .false.
     contains
         procedure :: getsize => get_size_int
+        procedure :: pack => pack_int
     end type
     interface mp_int_type
         procedure :: new_int
@@ -306,9 +308,65 @@ module messagepack_value
             ! TODO error handling
         end subroutine
 
-        subroutine pack_value(this, ptr)
+        subroutine pack_value(this, buf, error)
             class(mp_value_type) :: this
-            byte, pointer :: ptr
+            byte, allocatable, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            error = .true. ! this function should never be called
+        end subroutine
+
+        subroutine pack_int(this, buf, error)
+            class(mp_int_type) :: this
+            byte, allocatable, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            integer :: replength
+            call this%getsize(replength)
+            if (replength > size(buf)) then
+                error = .true.
+                return
+            end if
+            if (this%value < 0) then
+                if (this%value >= -32) then
+                    ! negative fixint
+                else if (this%value >= -128) then
+                    ! int8
+                    buf(1) = MP_I8
+                    buf(2) = int(this%value, kind=int8)
+                else if (this%value >= -32768) then
+                    ! int16
+                    buf(1) = MP_I16
+                    call int_to_bytes_be_2(buf(2:3), int(this%value, kind=int16))
+                else if (this%value >= -2147483648_int64) then
+                    ! int32
+                    buf(1) = MP_I32
+                    call int_to_bytes_be_4(buf(2:5), int(this%value, kind=int32))
+                else
+                    ! int64
+                    buf(1) = MP_I64
+                    call int_to_bytes_be_8(buf(2:9), int(this%value, kind=int64))
+                end if
+            else
+                if (this%value <= 127) then
+                    buf(1) = int(this%value, kind=int8)
+                else if (this%value <= 255) then
+                    ! uint8
+                    buf(1) = MP_U8
+                    buf(2) = int(this%value, kind=int8)
+                else if (this%value <= 65535) then
+                    ! uint16
+                    buf(1) = MP_U16
+                    call int_to_bytes_be_2(buf(2:3), int(this%value, kind=int16))
+                else if (this%value <= 4294967295_int64) then
+                    ! uint32
+                    buf(1) = MP_U32
+                    call int_to_bytes_be_4(buf(2:5), int(this%value, kind=int32))
+                else
+                    ! TODO handle uint64
+                    buf(1) = MP_U64
+                end if
+            end if
         end subroutine
 
         function is_nil(obj) result(res)
