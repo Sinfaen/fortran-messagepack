@@ -19,3 +19,7 @@ e2 = executable('unpacking',
     'test/unpacking.f90',
     dependencies : [my_dep])
 test('unpacking', e2)
+e3 = executable('packing',
+    'test/packing.f90',
+    dependencies : [my_dep])
+test('packing', e3)
