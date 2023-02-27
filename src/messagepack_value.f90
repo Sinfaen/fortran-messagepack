@@ -59,6 +59,7 @@ module messagepack_value
     public :: is_nil, is_bool, is_int, is_float, is_str, is_bin, is_arr, is_map, is_ext
     public :: new_real32, new_real64
     public :: get_int, set_unsigned, is_unsigned
+    public :: get_str
 
     type :: mp_value_type
         ! nothing here
@@ -110,9 +111,10 @@ module messagepack_value
     end type
 
     type, extends(mp_value_type) :: mp_str_type
-        character, allocatable :: value
+        character(:), allocatable :: value
     contains
         procedure :: getsize => get_size_str
+        procedure :: pack => pack_str
     end type
     interface mp_str_type
         procedure :: new_str
@@ -160,13 +162,13 @@ module messagepack_value
     contains
         subroutine get_size_1(this, osize)
             class(mp_value_type) :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
             osize = 1
         end subroutine
 
         subroutine get_size_int(this, osize)
             class(mp_int_type) :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
             if (this%value < 0) then
                 if (this%value >= -32) then
                     osize = 1 ! negative fixint
@@ -196,7 +198,7 @@ module messagepack_value
 
         subroutine get_size_float(this, osize)
             class(mp_float_type) :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
             if (this%is_64) then
                 osize = 9 ! real64
             else
@@ -204,26 +206,45 @@ module messagepack_value
             end if
         end subroutine
 
+        integer function get_str_type(length)
+            ! get type of string based on length of the string
+            integer(kind=int64), intent(in) :: length
+            if (length <= 31) then
+                get_str_type = MP_FS_L + int(length, kind=int8)
+            else if (length <= 255) then
+                get_str_type = MP_S8
+            else if (length <= 65535) then
+                get_str_type = MP_S16
+            else if (length <= 4294967295_int64) then
+                get_str_type = MP_S32
+            else
+                get_str_type = MP_NU ! bad
+            end if
+        end function
+
         subroutine get_size_str(this, osize)
             class(mp_str_type)   :: this
-            integer, intent(out) :: osize
-            integer :: length
+            integer(kind=int64), intent(out) :: osize
+            integer(kind=int64) :: length
             length = len(this%value)
-            if (length <= 31) then
-                osize = length + 1 ! fixstr
-            else if (length <= 255) then
+            select case(get_str_type(length))
+            case (MP_FS_L:MP_FS_H)
+                osize = length + 1
+            case (MP_S8)
                 osize = length + 2 ! str8
-            else if (length <= 65535) then
+            case (MP_S16)
                 osize = length + 3 ! str16
-            else
+            case (MP_S32)
                 osize = length + 5 ! str32
-            end if
-            ! TODO handle longer than error case
+            case default
+                osize = 0
+                print *, "WARNING BAD STRING"
+            end select
         end subroutine
 
         subroutine get_size_bin(this, osize)
             class(mp_bin_type)   :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
             integer :: length
             length = size(this%value)
             if (length <= 255) then
@@ -238,8 +259,8 @@ module messagepack_value
 
         subroutine get_size_arr(this, osize)
             class(mp_arr_type)   :: this
-            integer, intent(out) :: osize
-            integer i, elemsize, length
+            integer(kind=int64), intent(out) :: osize
+            integer(kind=int64) i, elemsize, length
 
             length = size(this%value)
             ! set initial value
@@ -261,9 +282,9 @@ module messagepack_value
 
         subroutine get_size_map(this, osize)
             class(mp_map_type)   :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
 
-            integer keysize, valuesize, i
+            integer(kind=int64) keysize, valuesize, i
             ! set initialsize
             if (this%numelements <= 15) then
                 osize = 1 ! fixmap
@@ -284,7 +305,7 @@ module messagepack_value
 
         subroutine get_size_ext(this, osize)
             class(mp_ext_type)   :: this
-            integer, intent(out) :: osize
+            integer(kind=int64), intent(out) :: osize
             integer :: length
 
             length = size(this%value)
@@ -321,7 +342,7 @@ module messagepack_value
             byte, allocatable, dimension(:) :: buf
             logical, intent(out) :: error
 
-            integer :: replength
+            integer(kind=int64) :: replength
             call this%getsize(replength)
             if (replength > size(buf)) then
                 error = .true.
@@ -330,6 +351,7 @@ module messagepack_value
             if (this%value < 0) then
                 if (this%value >= -32) then
                     ! negative fixint
+                    buf(1) = int(-32, kind=int8) - this%value
                 else if (this%value >= -128) then
                     ! int8
                     buf(1) = MP_I8
@@ -378,6 +400,46 @@ module messagepack_value
                     call int_to_bytes_be_8(buf(2:9), int(this%value, kind=int64))
                 end if
             end if
+        end subroutine
+
+        subroutine pack_str(this, buf, error)
+            class(mp_str_type) :: this
+            byte, allocatable, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer :: strtype
+            integer :: writeindex
+            integer(kind=int64) :: i
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize values
+            length = len(this%value)
+            strtype = get_str_type(length)
+            buf(1) = int(strtype, kind=int8) ! write marker
+
+            select case(strtype)
+            case (MP_FS_L:MP_FS_H)
+                writeindex = 1
+            case (MP_S8)
+                writeindex = 2
+                buf(2) = int(length, kind=int8)
+            case (MP_S16)
+                writeindex = 3
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+            case (MP_S32)
+                writeindex = 5
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            end select
+            do i = 1,length
+                buf(writeindex+i) = transfer(this%value(i:i), 0_int8)
+            end do
+            error = .false.
         end subroutine
 
         function is_nil(obj) result(res)
@@ -544,7 +606,7 @@ module messagepack_value
         end function new_real64
 
         type(mp_str_type) function new_str(arg)
-            character, allocatable :: arg
+            character(:), allocatable :: arg
             new_str%value = arg
         end function new_str
 
@@ -618,6 +680,22 @@ module messagepack_value
                 stat = .true.
             class default
                 val  = 0
+                stat = .false.
+            end select
+        end subroutine
+
+        subroutine get_str(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            character(:), allocatable, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type (obj)
+            type is (mp_value_type)
+            class is (mp_str_type)
+                val = obj%value
+                stat = .true.
+            class default
+                val = ""
                 stat = .false.
             end select
         end subroutine

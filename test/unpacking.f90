@@ -6,6 +6,7 @@ program unpacking
     byte, allocatable, dimension(:) :: stream ! buffer of bytes
     class(mp_value_type), allocatable :: mpv  ! pointer to value
     integer(kind=int64) :: itmp
+    character(:), allocatable :: stmp
     logical :: stat
 
     print *, "Unpacking test"
@@ -111,5 +112,29 @@ program unpacking
     end if
     deallocate(mpv)
     print *, "[Info: U64 test succeeded"
+
+    ! fixstr test: "Lego"
+    allocate(stream(5))
+    stream(1) = ior(MP_FS_L, 4)
+    stream(2) = 76  ! L
+    stream(3) = 101 ! e
+    stream(4) = 103 ! g
+    stream(5) = 111 ! o
+    call unpack_stream(stream, mpv, stat)
+    deallocate(stream)
+    if (.not.(stat)) then
+        print *, "[Error: issue occurred with unpacking stream"
+        stop 1
+    end if
+    if (.not.(is_str(mpv))) then
+        print *, "[Error: Did not unpack an int"
+        stop 1
+    end if
+    call get_str(mpv, stmp, stat)
+    if (stmp /= "Lego") then
+        print *, "[Error: fixstr unpacked '", stmp, "' instead of 'Lego'"
+        stop 1
+    end if
+    print *, "[Info: Fixstr test succeeded"
 
 end program

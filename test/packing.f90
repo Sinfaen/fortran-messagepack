@@ -5,7 +5,11 @@ program packing
 
     ! variables to use
     class(mp_int_type), allocatable :: int_test
+    class(mp_str_type), allocatable :: str_test
     byte, allocatable, dimension(:) :: buf
+    character(:), allocatable :: small_text
+    integer :: i
+    integer :: length
     logical :: errored
 
     int_test = mp_int_type(4)
@@ -19,8 +23,13 @@ program packing
         stop 1
     end if
     ! we expect a single byte that contains the value 4
-    if (size(buf) /= 1 .and. buf(1) /= 4_int8) then
-        print *, "[Error: packing of the value 4 failed"
+    if (size(buf) == 1) then
+        if (buf(1) /= 4_int8) then
+            print *, "[Error: failed to pack NFI. byte(1): ", buf(1)
+            stop 1
+        end if
+    else
+        print *, "[Error: failed to pack NFI. Size: ", size(buf)
         stop 1
     end if
     deallocate(buf)
@@ -31,16 +40,61 @@ program packing
     int_test = mp_int_type(-5)
     call pack_alloc(int_test, buf, errored)
     if (errored) then
-        print *, "[Error: failed to pack int"
+        print *, "[Error: failed to pack NFI"
         stop 1
     end if
-    ! we expect a single byte that contains the value -26 (0b11100110 as int8)
-    if (size(buf) /= 1 .and. buf(1) /= -26_int8) then
-        print *, "[Error: packing of the value -5 failed"
-        stop 1
+    ! we expect a single byte that contains the value -27 (0b11100101 as int8)
+    if (size(buf) == 1) then
+        if (buf(1) /= -27_int8) then
+            print *, "[Error: failed to pack NFI. byte(1): ", buf(1)
+            stop 1
+        end if
+    else
+        print *, "[Error: failed to pack PFI. Size: ", size(buf)
     end if
     deallocate(buf)
     deallocate(int_test)
     print *, "[Info: NFI packing test succeeded"
+
+    ! Str8 test
+    allocate(character(len=163) :: small_text)
+    small_text = "It's a dangerous business, Frodo, going "
+    small_text = small_text // "out your door. You step onto the road, a"
+    small_text = small_text // "nd if you don't keep your feet, there's "
+    small_text = small_text // "no knowing where you might be swept off to."
+    str_test = mp_str_type(small_text)
+    call pack_alloc(str_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack Str8"
+        stop 1
+    end if
+    length = len(small_text)
+    ! expect 163 + 2 bytes
+    if (size(buf) == length + 2) then
+        if (buf(1) /= MP_S8) then
+            print *, "[Error: failed to pack str8. byte(1): ", buf(1)
+            stop 1
+        end if
+    else
+        print *, "[Error: failed to pack str8. Size: ", size(buf)
+        stop 1
+    end if
+    ! expect reported number of bytes to be -93 (163 as int8)
+    if (buf(2) /= -93) then
+        print *, "[Error: reported number of bytes is not 163"
+        stop 1
+    end if
+    ! compare text
+    do i = 1,length
+        if (buf(2+i) /= transfer(small_text(i:i), 1_int8)) then
+            print *, "[Error: Str8 buffer did not match at index: ", 2+i
+            print *, "[Info: ", transfer(small_text(i:i), 0_int8), "!=", buf(2+i)
+            stop 1
+        end if
+    end do
+    deallocate(buf)
+    deallocate(str_test)
+    deallocate(small_text)
+    print *, "[Info: Str8 packing test succeeded"
 
 end program
