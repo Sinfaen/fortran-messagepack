@@ -49,11 +49,13 @@ module messagepack_unpack
             ! other variables to use
             integer :: length
             byte :: btemp1 ! byte temp value
+            integer(kind=int16) :: val_int16
+            integer(kind=int32) :: val_int32
+            integer(kind=int64) :: val_int64
 
             length = size(buffer)
 
             ! set default output values
-            mpv = mp_nil_type()
             successful = .true.
 
             ! need to have data available to read
@@ -86,7 +88,7 @@ module messagepack_unpack
             ! binary format family
             case (MP_B8)
                 ! 1 byte to describe the number of data bytes
-                if (check_length_and_print(2, length)) then
+                if (.not. check_length_and_print(2, length)) then
                     successful = .false.
                     return
                 end if
@@ -109,45 +111,78 @@ module messagepack_unpack
             ! need to watch when grabbed values are negative
             case (MP_U8)
                 ! 1 byte following
-                if (check_length_and_print(2, length)) then
+                if (.not. check_length_and_print(2, length)) then
                     successful = .false.
                     return
                 end if
                 btemp1 = buffer(2)
-                if (btemp1 < 0) then
-                    ! negative, reinterpret bits
-                else
-                    ! positive, good to use immediately
+                if (btemp1 >= 0) then
                     mpv = mp_int_type(btemp1)
+                else
+                    mpv = mp_int_type(255_int16 + btemp1)
                 end if
             case (MP_U16)
+                ! 2 bytes following
+                if (.not. check_length_and_print(3, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                if (val_int16 >= 0) then
+                    mpv = mp_int_type(val_int16)
+                else
+                    mpv = mp_int_type(65536_int32 + val_int16)
+                end if
             case (MP_U32)
+                ! 4 bytes following
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
+                if (val_int32 >= 0) then
+                    mpv = mp_int_type(val_int32)
+                else
+                    mpv = mp_int_type(4294967296_int64 + val_int32)
+                end if
             case (MP_U64)
+                ! 8 bytes following
+                if (.not. check_length_and_print(9, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int64 = bytes_be_to_int_8(buffer(2:9), is_little_endian)
+                if (val_int64 >= 0) then
+                    mpv = mp_int_type(val_int64)
+                else
+                    mpv = mp_int_type(val_int64)
+                    call set_unsigned(mpv)
+                end if
             ! Signed integers >>>
             case (MP_I8)
                 ! 1 byte following
-                if (check_length_and_print(2, length)) then
+                if (.not. check_length_and_print(2, length)) then
                     successful = .false.
                     return
                 end if
                 mpv = mp_int_type(buffer(2))
             case (MP_I16)
                 ! 2 bytes following
-                if (check_length_and_print(3, length)) then
+                if (.not. check_length_and_print(3, length)) then
                     successful = .false.
                     return
                 end if
                 mpv = mp_int_type(bytes_be_to_int_2(buffer(2:3), is_little_endian))
             case (MP_I32)
                 ! 4 bytes following
-                if (check_length_and_print(5, length)) then
+                if (.not. check_length_and_print(5, length)) then
                     successful = .false.
                     return
                 end if
                 mpv = mp_int_type(bytes_be_to_int_4(buffer(2:5), is_little_endian))
             case (MP_I64)
                 ! 8 bytes following
-                if (check_length_and_print(9, length)) then
+                if (.not. check_length_and_print(9, length)) then
                     successful = .false.
                     return
                 end if
