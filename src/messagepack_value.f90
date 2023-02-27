@@ -1,6 +1,7 @@
 module messagepack_value
     use iso_fortran_env
     use,intrinsic :: ieee_arithmetic
+    use byte_utilities
 
     implicit none
 
@@ -57,7 +58,7 @@ module messagepack_value
     public :: mp_arr_type, mp_map_type, mp_ext_type
     public :: is_nil, is_bool, is_int, is_float, is_str, is_bin, is_arr, is_map, is_ext
     public :: new_real32, new_real64
-    public :: get_int
+    public :: get_int, set_unsigned, is_unsigned
 
     type :: mp_value_type
         ! nothing here
@@ -84,14 +85,15 @@ module messagepack_value
     end interface mp_bool_type
 
     type, extends(mp_value_type) :: mp_int_type
-        ! fortran integers are signed
-        ! since MessagePack supports unsigned integers,
-        ! this code needs to handle the case where a uint64 is unpacked
-        ! the `signed` value will go low when this is detected during unpacking
+        ! fortran integers are signed. since MsgPack defines unsigned integers,
+        ! this needs to handle the case where a uint64 is unpacked, or the user
+        ! wants to serialize a uint64, which is the only case where this matters
+        ! the `unsigned` flag will go high when this is detected during unpacking
         integer(kind=int64) :: value
-        logical :: signed = .false.
+        logical :: unsigned_64 = .false.
     contains
         procedure :: getsize => get_size_int
+        procedure :: pack => pack_int
     end type
     interface mp_int_type
         procedure :: new_int
@@ -175,7 +177,7 @@ module messagepack_value
                 else if (this%value >= -2147483648_int64) then
                     osize = 5 ! int32
                 else
-                    osize = 9 ! int64
+                    osize = 9 ! int64 & uint64
                 end if
             else
                 if (this%value <= 127) then
@@ -187,7 +189,7 @@ module messagepack_value
                 else if (this%value <= 4294967295_int64) then
                     osize = 5 ! uint32
                 else
-                    osize = 5 ! TODO handle uint64
+                    osize = 9 ! uint64 & int64
                 end if
             end if
         end subroutine
@@ -306,9 +308,76 @@ module messagepack_value
             ! TODO error handling
         end subroutine
 
-        subroutine pack_value(this, ptr)
+        subroutine pack_value(this, buf, error)
             class(mp_value_type) :: this
-            byte, pointer :: ptr
+            byte, allocatable, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            error = .true. ! this function should never be called
+        end subroutine
+
+        subroutine pack_int(this, buf, error)
+            class(mp_int_type) :: this
+            byte, allocatable, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            integer :: replength
+            call this%getsize(replength)
+            if (replength > size(buf)) then
+                error = .true.
+                return
+            end if
+            if (this%value < 0) then
+                if (this%value >= -32) then
+                    ! negative fixint
+                else if (this%value >= -128) then
+                    ! int8
+                    buf(1) = MP_I8
+                    buf(2) = int(this%value, kind=int8)
+                else if (this%value >= -32768) then
+                    ! int16
+                    buf(1) = MP_I16
+                    call int_to_bytes_be_2(buf(2:3), int(this%value, kind=int16))
+                else if (this%value >= -2147483648_int64) then
+                    ! int32
+                    buf(1) = MP_I32
+                    call int_to_bytes_be_4(buf(2:5), int(this%value, kind=int32))
+                else
+                    if (this%unsigned_64) then
+                        ! uint64
+                        buf(1) = MP_U64
+                    else
+                        ! int64
+                        buf(1) = MP_I64
+                    end if
+                    call int_to_bytes_be_8(buf(2:9), int(this%value, kind=int64))
+                end if
+            else
+                if (this%value <= 127) then
+                    buf(1) = int(this%value, kind=int8)
+                else if (this%value <= 255) then
+                    ! uint8
+                    buf(1) = MP_U8
+                    buf(2) = int(this%value, kind=int8)
+                else if (this%value <= 65535) then
+                    ! uint16
+                    buf(1) = MP_U16
+                    call int_to_bytes_be_2(buf(2:3), int(this%value, kind=int16))
+                else if (this%value <= 4294967295_int64) then
+                    ! uint32
+                    buf(1) = MP_U32
+                    call int_to_bytes_be_4(buf(2:5), int(this%value, kind=int32))
+                else
+                    if (this%unsigned_64) then
+                        ! uint64
+                        buf(1) = MP_U64
+                    else
+                        ! int64
+                        buf(1) = MP_I64
+                    end if
+                    call int_to_bytes_be_8(buf(2:9), int(this%value, kind=int64))
+                end if
+            end if
         end subroutine
 
         function is_nil(obj) result(res)
@@ -434,9 +503,31 @@ module messagepack_value
         end function new_bool
 
         type(mp_int_type) function new_int(arg)
+            ! generic constructor for integers
             integer(kind=int64), intent(in) :: arg
             new_int%value  = arg
         end function new_int
+
+        subroutine set_unsigned(obj)
+            ! Changes the unsigned_64 flag to true for packing purposes
+            class(mp_value_type), intent(inout) :: obj
+            select type (obj)
+            type is (mp_value_type)
+            class is (mp_int_type)
+                obj%unsigned_64 = .true.
+            end select
+        end subroutine
+
+        logical function is_unsigned(obj)
+            class(mp_value_type), intent(in) :: obj
+            select type (obj)
+            type is (mp_value_type)
+            class is (mp_int_type)
+                is_unsigned = obj%unsigned_64
+            class default
+                is_unsigned = .false.
+            end select
+        end function
 
         type(mp_float_type) function new_real32(arg)
             real(kind=real32), intent(in) :: arg

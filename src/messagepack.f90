@@ -9,6 +9,7 @@ module messagepack
     use messagepack_value
     use messagepack_pack
     use messagepack_unpack
+    use byte_utilities
     implicit none
 contains
     subroutine print_version()
