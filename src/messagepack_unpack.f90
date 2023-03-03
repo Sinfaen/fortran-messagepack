@@ -115,12 +115,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                btemp1 = buffer(2)
-                if (btemp1 >= 0) then
-                    mpv = mp_int_type(btemp1)
-                else
-                    mpv = mp_int_type(255_int16 + btemp1)
-                end if
+                mpv = mp_int_type(int8_as_unsigned(buffer(2)))
             case (MP_U16)
                 ! 2 bytes following
                 if (.not. check_length_and_print(3, length)) then
@@ -128,11 +123,7 @@ module messagepack_unpack
                     return
                 end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
-                if (val_int16 >= 0) then
-                    mpv = mp_int_type(val_int16)
-                else
-                    mpv = mp_int_type(65536_int32 + val_int16)
-                end if
+                mpv = mp_int_type(int16_as_unsigned(val_int16))
             case (MP_U32)
                 ! 4 bytes following
                 if (.not. check_length_and_print(5, length)) then
@@ -140,11 +131,7 @@ module messagepack_unpack
                     return
                 end if
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
-                if (val_int32 >= 0) then
-                    mpv = mp_int_type(val_int32)
-                else
-                    mpv = mp_int_type(4294967296_int64 + val_int32)
-                end if
+                mpv = mp_int_type(int32_as_unsigned(val_int32))
             case (MP_U64)
                 ! 8 bytes following
                 if (.not. check_length_and_print(9, length)) then
@@ -194,6 +181,12 @@ module messagepack_unpack
             case (MP_FE8)
             case (MP_FE16)
             case (MP_S8)
+                ! 1 byte following
+                if (.not. check_length_and_print(2, length)) then
+                    successful = .false.
+                    return
+                end if
+                btemp1 = buffer(2) ! length, but unsigned
             case (MP_S16)
             case (MP_S32)
             case (MP_A16)
