@@ -17,7 +17,7 @@ module messagepack_pack
             class(mp_value_type) :: mpv
             logical, intent(out) :: error
             byte, allocatable, dimension(:), intent(out) :: buffer
-            integer dblen
+            integer(kind=int64) dblen
 
             call mpv%getsize(dblen) ! get buffer size required
             allocate(buffer(dblen)) ! allocate buffer

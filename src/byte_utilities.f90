@@ -184,4 +184,37 @@ module byte_utilities
                 call int_be_to_bytes_be_8(bytes, value)
             end if
         end subroutine
+
+        integer(kind=int16) function int8_as_unsigned(value)
+        ! interprets an unsigned int8 value as a signed value
+        ! by increasing the storage width
+            integer(kind=int8), intent(in) :: value
+            
+            int8_as_unsigned = value
+            if (value < 0) then
+                int8_as_unsigned = iand(int8_as_unsigned, 255_int16)
+            end if
+        end function
+
+        integer(kind=int32) function int16_as_unsigned(value)
+        ! interprets an unsigned int16 value as a signed value
+        ! by increasing the storage width
+            integer(kind=int16), intent(in) :: value
+            
+            int16_as_unsigned = value
+            if (value < 0) then
+                int16_as_unsigned = iand(int16_as_unsigned, 65536_int32)
+            end if
+        end function
+
+        integer(kind=int64) function int32_as_unsigned(value)
+        ! interprets an unsigned int32 value as a signed value
+        ! by increasing the storage width
+            integer(kind=int32), intent(in) :: value
+            
+            int32_as_unsigned = value
+            if (value < 0) then
+                int32_as_unsigned = iand(int32_as_unsigned, 4294967295_int64)
+            end if
+        end function
 end module

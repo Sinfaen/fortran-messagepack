@@ -48,10 +48,13 @@ module messagepack_unpack
 
             ! other variables to use
             integer :: length
+            integer :: i
+            integer(kind=int64) :: i_64
             byte :: btemp1 ! byte temp value
             integer(kind=int16) :: val_int16
             integer(kind=int32) :: val_int32
             integer(kind=int64) :: val_int64
+            character(:), allocatable :: val_char
 
             length = size(buffer)
 
@@ -74,7 +77,17 @@ module messagepack_unpack
             case (MP_FA_L:MP_FA_H)
                 print *, "Fixarray"
             case (MP_FS_L:MP_FS_H)
-                print *, "Fixstr"
+                btemp1 = 0
+                call mvbits(buffer(1), 0, 5, btemp1, 0) ! get fixstr length
+                if (.not. check_length_and_print(1 + btemp1, length)) then
+                    successful = .false.
+                    return
+                end if
+                allocate(character(btemp1) :: val_char)
+                do i = 1,btemp1
+                    val_char(i:i) = transfer(buffer(1 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
             case (MP_NIL)
                 ! default is already nil
                 return
@@ -87,12 +100,6 @@ module messagepack_unpack
                 mpv = mp_bool_type(.true.)
             ! binary format family
             case (MP_B8)
-                ! 1 byte to describe the number of data bytes
-                if (.not. check_length_and_print(2, length)) then
-                    successful = .false.
-                    return
-                end if
-                btemp1 = buffer(2)
                 print *, "Bin8"
             case (MP_B16)
                 print *, "Bin16"
@@ -115,12 +122,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                btemp1 = buffer(2)
-                if (btemp1 >= 0) then
-                    mpv = mp_int_type(btemp1)
-                else
-                    mpv = mp_int_type(255_int16 + btemp1)
-                end if
+                mpv = mp_int_type(int8_as_unsigned(buffer(2)))
             case (MP_U16)
                 ! 2 bytes following
                 if (.not. check_length_and_print(3, length)) then
@@ -128,11 +130,7 @@ module messagepack_unpack
                     return
                 end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
-                if (val_int16 >= 0) then
-                    mpv = mp_int_type(val_int16)
-                else
-                    mpv = mp_int_type(65536_int32 + val_int16)
-                end if
+                mpv = mp_int_type(int16_as_unsigned(val_int16))
             case (MP_U32)
                 ! 4 bytes following
                 if (.not. check_length_and_print(5, length)) then
@@ -140,11 +138,7 @@ module messagepack_unpack
                     return
                 end if
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
-                if (val_int32 >= 0) then
-                    mpv = mp_int_type(val_int32)
-                else
-                    mpv = mp_int_type(4294967296_int64 + val_int32)
-                end if
+                mpv = mp_int_type(int32_as_unsigned(val_int32))
             case (MP_U64)
                 ! 8 bytes following
                 if (.not. check_length_and_print(9, length)) then
@@ -194,8 +188,61 @@ module messagepack_unpack
             case (MP_FE8)
             case (MP_FE16)
             case (MP_S8)
+                ! 2 bytes for header
+                if (.not. check_length_and_print(2, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int16 = int8_as_unsigned(buffer(2))
+                if (.not. check_length_and_print(2 + val_int16, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int16) :: val_char)
+                do i = 1,val_int16
+                    val_char(i:i) = transfer(buffer(2 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
             case (MP_S16)
+                ! 3 bytes for header
+                if (.not. check_length_and_print(3, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                val_int32 = int16_as_unsigned(val_int16)
+                if (.not. check_length_and_print(3 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int32) :: val_char)
+                do i = 1,val_int32
+                    val_char(i:i) = transfer(buffer(3 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
             case (MP_S32)
+                ! 5 bytes for header
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:53), is_little_endian)
+                val_int64 = int32_as_unsigned(val_int32)
+                if (5 + val_int64 > length) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int64) :: val_char)
+                do i_64 = 1_int64,val_int64
+                    val_char(i_64:i_64) = transfer(buffer(3 + i_64), 'a')
+                end do
+                mpv = mp_str_type(val_char)
             case (MP_A16)
             case (MP_A32)
             case (MP_M16)
