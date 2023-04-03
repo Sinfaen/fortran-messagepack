@@ -66,11 +66,12 @@ module messagepack_value
     contains
         procedure :: getsize => get_size_1
         procedure :: pack => pack_value
+        procedure :: numelements => ne_1
     end type
 
     ! pointer handler for container types
     type :: mp_value_type_ptr
-        class(mp_value_type), pointer :: obj
+        class(mp_value_type), allocatable :: obj
     end type
 
     type, extends(mp_value_type) :: mp_nil_type
@@ -80,6 +81,9 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_bool_type
         ! nothing here
         logical :: value
+    contains
+        procedure :: getsize => get_size_bool
+        procedure :: pack => pack_bool
     end type
     interface mp_bool_type
         procedure :: new_bool
@@ -108,6 +112,7 @@ module messagepack_value
         logical :: is_64 = .true.
     contains
         procedure :: getsize => get_size_float
+        procedure :: pack => pack_float
     end type
 
     type, extends(mp_value_type) :: mp_str_type
@@ -133,6 +138,8 @@ module messagepack_value
         class(mp_value_type_ptr), allocatable, dimension(:) :: value
     contains
         procedure :: getsize => get_size_arr
+        procedure :: numelements => get_arr_size
+        procedure :: pack => pack_arr
     end type
     interface mp_arr_type
         procedure :: new_arr
@@ -141,7 +148,7 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_map_type
         class(mp_value_type_ptr), allocatable, dimension(:) :: keys
         class(mp_value_type_ptr), allocatable, dimension(:) :: values
-        integer :: numelements
+        integer :: ne
     contains
         procedure :: getsize => get_size_map
     end type
@@ -162,6 +169,17 @@ module messagepack_value
     contains
         subroutine get_size_1(this, osize)
             class(mp_value_type) :: this
+            integer(kind=int64), intent(out) :: osize
+            osize = 1
+        end subroutine
+
+        integer function ne_1(obj)
+            class(mp_value_type) :: obj
+            ne_1 = 1
+        end function
+
+        subroutine get_size_bool(this, osize)
+            class(mp_bool_type) :: this
             integer(kind=int64), intent(out) :: osize
             osize = 1
         end subroutine
@@ -219,6 +237,20 @@ module messagepack_value
                 get_str_type = MP_S32
             else
                 get_str_type = MP_NU ! bad
+            end if
+        end function
+
+        integer function get_arr_type(length)
+            ! get type of array based on length of the array
+            integer(kind=int64), intent(in) :: length
+            if (length <= 15) then
+                get_arr_type = int(ior(MP_FA_L, int(length)), kind=int8)
+            else if (length <= 65535) then
+                get_arr_type = MP_A16
+            else if (length <= 4294967295_int64) then
+                get_arr_type = MP_A32
+            else
+                get_arr_type = MP_NU ! bad
             end if
         end function
 
@@ -286,9 +318,9 @@ module messagepack_value
 
             integer(kind=int64) keysize, valuesize, i
             ! set initialsize
-            if (this%numelements <= 15) then
+            if (this%ne <= 15) then
                 osize = 1 ! fixmap
-            else if (this%numelements <= 65535) then
+            else if (this%ne <= 65535) then
                 osize = 3 ! map16
             else
                 osize = 5 ! map32
@@ -296,7 +328,7 @@ module messagepack_value
             ! TODO handle errors for larger
 
             ! get sizes of all contained values
-            do i = 1, this%numelements
+            do i = 1, this%ne
                 call this%keys(i)%obj%getsize(keysize)
                 call this%values(i)%obj%getsize(valuesize)
                 osize = osize + keysize + valuesize
@@ -331,15 +363,33 @@ module messagepack_value
 
         subroutine pack_value(this, buf, error)
             class(mp_value_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+            print *, "[Error: abstract pack function called"
+            error = .true. ! this function should never be called
+        end subroutine
+
+        subroutine pack_bool(this, buf, error)
+            class(mp_bool_type) :: this
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
-            error = .true. ! this function should never be called
+            if (size(buf) < 1) then
+                error = .true.
+                return
+            end if
+
+            if (this%value) then
+                buf(1) = MP_T
+            else
+                buf(1) = MP_F
+            end if
+            error = .false.
         end subroutine
 
         subroutine pack_int(this, buf, error)
             class(mp_int_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
             integer(kind=int64) :: replength
@@ -348,10 +398,11 @@ module messagepack_value
                 error = .true.
                 return
             end if
+            error = .false.
             if (this%value < 0) then
                 if (this%value >= -32) then
                     ! negative fixint
-                    buf(1) = int(-32, kind=int8) - this%value
+                    buf(1) = int(-32 - this%value, kind=int8)
                 else if (this%value >= -128) then
                     ! int8
                     buf(1) = MP_I8
@@ -402,9 +453,34 @@ module messagepack_value
             end if
         end subroutine
 
+        subroutine pack_float(this, buf, error)
+            class(mp_float_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize value
+            if (this%is_64) then
+                buf(1) = MP_F64
+                call real_to_bytes_be_8(buf(2:9), this%f64value)
+            else
+                buf(1) = MP_F32
+                call real_to_bytes_be_4(buf(2:5), this%f32value)
+            end if
+
+            error = .false.
+        end subroutine
+
         subroutine pack_str(this, buf, error)
             class(mp_str_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
@@ -439,6 +515,47 @@ module messagepack_value
             do i = 1,length
                 buf(writeindex+i) = transfer(this%value(i:i), 0_int8)
             end do
+            error = .false.
+        end subroutine
+
+        recursive subroutine pack_arr(this, buf, error)
+            class(mp_arr_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer :: arrtype
+            integer :: writeindex
+            integer(kind=int64) :: i
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize values
+            length = this%numelements()
+            arrtype = get_arr_type(length)
+            buf(1) = int(arrtype, kind=int8) ! write marker
+
+            select case(arrtype)
+            case (MP_FA_L:MP_FA_H)
+                writeindex = 1
+            case (MP_A16)
+                writeindex = 3
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+            case (MP_A32)
+                writeindex = 5
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            end select
+            do i = 1,length
+                call this%value(i)%obj%pack(buf(writeindex +i:), error)
+                if (error) then
+                    return
+                end if
+            end do
+
             error = .false.
         end subroutine
 
@@ -623,17 +740,12 @@ module messagepack_value
             end if
         end function new_bin
 
-        type(mp_arr_type) function new_arr(arg, stat)
-            class(mp_value_type_ptr), allocatable, dimension(:) :: arg
-            logical, intent(out) :: stat
-            integer :: l
-            new_arr%value = arg
-            l = size(new_arr%value)
-            if (l > 2147483647_int64) then
-                stat = .false. ! too long
-            else
-                stat = .true.
+        type(mp_arr_type) function new_arr(length)
+            integer, intent(in) :: length ! number of elements to allocate
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated array with size greater than packing allows"
             end if
+            allocate(new_arr%value(length))
         end function new_arr
 
         type(mp_map_type) function new_map(keys, values, stat)
@@ -699,4 +811,9 @@ module messagepack_value
                 stat = .false.
             end select
         end subroutine
+
+        integer function get_arr_size(obj)
+            class(mp_arr_type) :: obj
+            get_arr_size = size(obj%value)
+        end function
 end module
