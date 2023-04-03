@@ -81,6 +81,9 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_bool_type
         ! nothing here
         logical :: value
+    contains
+        procedure :: getsize => get_size_bool
+        procedure :: pack => pack_bool
     end type
     interface mp_bool_type
         procedure :: new_bool
@@ -109,6 +112,7 @@ module messagepack_value
         logical :: is_64 = .true.
     contains
         procedure :: getsize => get_size_float
+        procedure :: pack => pack_float
     end type
 
     type, extends(mp_value_type) :: mp_str_type
@@ -135,6 +139,7 @@ module messagepack_value
     contains
         procedure :: getsize => get_size_arr
         procedure :: numelements => get_arr_size
+        procedure :: pack => pack_arr
     end type
     interface mp_arr_type
         procedure :: new_arr
@@ -172,6 +177,12 @@ module messagepack_value
             class(mp_value_type) :: obj
             ne_1 = 1
         end function
+
+        subroutine get_size_bool(this, osize)
+            class(mp_bool_type) :: this
+            integer(kind=int64), intent(out) :: osize
+            osize = 1
+        end subroutine
 
         subroutine get_size_int(this, osize)
             class(mp_int_type) :: this
@@ -226,6 +237,20 @@ module messagepack_value
                 get_str_type = MP_S32
             else
                 get_str_type = MP_NU ! bad
+            end if
+        end function
+
+        integer function get_arr_type(length)
+            ! get type of array based on length of the array
+            integer(kind=int64), intent(in) :: length
+            if (length <= 15) then
+                get_arr_type = int(ior(MP_FA_L, int(length)), kind=int8)
+            else if (length <= 65535) then
+                get_arr_type = MP_A16
+            else if (length <= 4294967295_int64) then
+                get_arr_type = MP_A32
+            else
+                get_arr_type = MP_NU ! bad
             end if
         end function
 
@@ -338,15 +363,33 @@ module messagepack_value
 
         subroutine pack_value(this, buf, error)
             class(mp_value_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+            print *, "[Error: abstract pack function called"
+            error = .true. ! this function should never be called
+        end subroutine
+
+        subroutine pack_bool(this, buf, error)
+            class(mp_bool_type) :: this
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
-            error = .true. ! this function should never be called
+            if (size(buf) < 1) then
+                error = .true.
+                return
+            end if
+
+            if (this%value) then
+                buf(1) = MP_T
+            else
+                buf(1) = MP_F
+            end if
+            error = .false.
         end subroutine
 
         subroutine pack_int(this, buf, error)
             class(mp_int_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
             integer(kind=int64) :: replength
@@ -355,6 +398,7 @@ module messagepack_value
                 error = .true.
                 return
             end if
+            error = .false.
             if (this%value < 0) then
                 if (this%value >= -32) then
                     ! negative fixint
@@ -409,9 +453,34 @@ module messagepack_value
             end if
         end subroutine
 
+        subroutine pack_float(this, buf, error)
+            class(mp_float_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize value
+            if (this%is_64) then
+                buf(1) = MP_F64
+                call real_to_bytes_be_8(buf(2:9), this%f64value)
+            else
+                buf(1) = MP_F32
+                call real_to_bytes_be_4(buf(2:5), this%f32value)
+            end if
+
+            error = .false.
+        end subroutine
+
         subroutine pack_str(this, buf, error)
             class(mp_str_type) :: this
-            byte, allocatable, dimension(:) :: buf
+            byte, dimension(:) :: buf
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
@@ -446,6 +515,47 @@ module messagepack_value
             do i = 1,length
                 buf(writeindex+i) = transfer(this%value(i:i), 0_int8)
             end do
+            error = .false.
+        end subroutine
+
+        recursive subroutine pack_arr(this, buf, error)
+            class(mp_arr_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer :: arrtype
+            integer :: writeindex
+            integer(kind=int64) :: i
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize values
+            length = this%numelements()
+            arrtype = get_arr_type(length)
+            buf(1) = int(arrtype, kind=int8) ! write marker
+
+            select case(arrtype)
+            case (MP_FA_L:MP_FA_H)
+                writeindex = 1
+            case (MP_A16)
+                writeindex = 3
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+            case (MP_A32)
+                writeindex = 5
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            end select
+            do i = 1,length
+                call this%value(i)%obj%pack(buf(writeindex +i:), error)
+                if (error) then
+                    return
+                end if
+            end do
+
             error = .false.
         end subroutine
 

@@ -9,7 +9,7 @@ program unpacking
     integer(kind=int64) :: itmp
     integer(kind=int64), dimension(3) :: i_a_3
     character(:), allocatable :: stmp
-    logical :: stat
+    logical :: status
 
     print *, "Unpacking test"
     call print_endianness()
@@ -17,9 +17,9 @@ program unpacking
     ! positive fix int test: VALUE = 45
     allocate(stream(1))
     stream(1) = 45
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -27,7 +27,7 @@ program unpacking
         print *, "[Error: Did not unpack an int"
         stop 1
     end if
-    call get_int(mpv, itmp, stat)
+    call get_int(mpv, itmp, status)
     if (itmp /= 45) then
         write(*,*) "[Error: Unpacked ", itmp, " instead of 45"
         stop 1
@@ -38,9 +38,9 @@ program unpacking
     ! negative fix int test: VALUE = -2
     allocate(stream(1))
     stream(1) = -30 ! 0b11100010 as int8
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -48,7 +48,7 @@ program unpacking
         print *, "[Error: Did not unpack an int"
         stop 1
     end if
-    call get_int(mpv, itmp, stat)
+    call get_int(mpv, itmp, status)
     if (itmp /= -2) then
         write(*,*) "[Error: Unpacked ", itmp, " instead of -2"
         stop 1
@@ -63,9 +63,9 @@ program unpacking
     stream(3) = -102_int8 ! 0x9a
     stream(4) =  -55_int8 ! 0xc9
     stream(5) =   -1_int8 ! 0xff
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -73,7 +73,7 @@ program unpacking
         print *, "[Error: Did not unpack an int"
         stop 1
     end if
-    call get_int(mpv, itmp, stat)
+    call get_int(mpv, itmp, status)
     if (itmp /= 3147483647_int64) then
         write(*,*) "[Error: Unpacked ", itmp, " instead of 3147483647"
         stop 1
@@ -94,9 +94,9 @@ program unpacking
     stream(7) =    0 ! 0x00
     stream(8) =    5 ! 0x05
     stream(9) =   65 ! 0x41
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -104,7 +104,7 @@ program unpacking
         print *, "[Error: Did not unpack an int"
         stop 1
     end if
-    call get_int(mpv, itmp, stat)
+    call get_int(mpv, itmp, status)
     if (itmp /= -9223372036854774463_int64) then
         write(*,*) "[Error: Unpacked (", itmp, ") instead of reinterpreted (-9223372036854774463)"
         stop 1
@@ -122,9 +122,9 @@ program unpacking
     stream(3) = 101 ! e
     stream(4) = 103 ! g
     stream(5) = 111 ! o
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -132,7 +132,7 @@ program unpacking
         print *, "[Error: Did not unpack an int"
         stop 1
     end if
-    call get_str(mpv, stmp, stat)
+    call get_str(mpv, stmp, status)
     if (stmp /= "Lego") then
         print *, "[Error: fixstr unpacked '", stmp, "' instead of 'Lego'"
         stop 1
@@ -151,9 +151,9 @@ program unpacking
     stream(4) = MP_I16 ! int 16 byte mark
     stream(5) = 125 ! 0x7d
     stream(6) = 0   ! 0x00
-    call unpack_stream(stream, mpv, stat)
+    call unpack_stream(stream, mpv, status)
     deallocate(stream)
-    if (.not.(stat)) then
+    if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream"
         stop 1
     end if
@@ -172,7 +172,7 @@ program unpacking
                 print *, "[Error: fixarray[", i, "] is not an int"
                 stop 1
             end if
-            call get_int(mpv%value(i)%obj, itmp, stat)
+            call get_int(mpv%value(i)%obj, itmp, status)
             if (itmp /= i_a_3(i)) then
                 print *, "[Error: unpacked ", itmp, "instead of", i_a_3(i), "for fixarray > ", i
             end if

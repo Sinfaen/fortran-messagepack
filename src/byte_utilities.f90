@@ -21,6 +21,7 @@ module byte_utilities
             end if
         end subroutine
 
+        ! BIG ENDIAN bytes ==> LITTLE ENDIAN
         integer(kind=int16) function bytes_be_int_le_2(bytes)
             ! converts bytes in big-endian to an int16 in little endian
             byte, dimension(2), intent(in) :: bytes
@@ -40,23 +41,50 @@ module byte_utilities
                 bytes(4), bytes(3), bytes(2), bytes(1)], 0_int64)
         end function
 
+        real(kind=real32) function bytes_be_real_le_4(bytes)
+        ! converts bytes in big-endian to a real32 in little endian
+            byte, dimension(4), intent(in) :: bytes
+            bytes_be_real_le_4 = transfer([bytes(4), bytes(3), bytes(2), bytes(1)], 0_real32)
+        end function
+
+        real(kind=real64) function bytes_be_real_le_8(bytes)
+        ! converts bytes in big-endian to a real64 in little endian
+            byte, dimension(8), intent(in) :: bytes
+            bytes_be_real_le_8 = transfer([bytes(8), bytes(7), bytes(6), bytes(5), &
+                bytes(4), bytes(3), bytes(2), bytes(1)], 0_real64)
+        end function
+
+        ! BIG ENDIAN bytes ==> BIG ENDIAN
         integer(kind=int16) function bytes_be_int_be_2(bytes)
-            ! converts bytes in big-endian to an int16 in big endian
+        ! converts bytes in big-endian to an int16 in big endian
             byte, dimension(2), intent(in) :: bytes
             bytes_be_int_be_2 = transfer([bytes(1), bytes(2)], 0_int16)
         end function
 
         integer(kind=int32) function bytes_be_int_be_4(bytes)
-        ! converts bytes in big-endian to an int32 in little endian
+        ! converts bytes in big-endian to an int32 in big endian
             byte, dimension(4), intent(in) :: bytes
             bytes_be_int_be_4 = transfer([bytes(1), bytes(2), bytes(3), bytes(4)], 0_int32)
         end function
 
         integer(kind=int64) function bytes_be_int_be_8(bytes)
-        ! converts bytes in big-endian to an int64 in little endian
+        ! converts bytes in big-endian to an int64 in big endian
             byte, dimension(8), intent(in) :: bytes
             bytes_be_int_be_8 = transfer([bytes(1), bytes(2), bytes(3), bytes(4), &
                 bytes(5), bytes(6), bytes(7), bytes(8)], 0_int64)
+        end function
+
+        real(kind=real32) function bytes_be_real_be_4(bytes)
+        ! converts bytes in big-endian to a real32 in big endian
+            byte, dimension(4), intent(in) :: bytes
+            bytes_be_real_be_4 = transfer([bytes(1), bytes(2), bytes(3), bytes(4)], 0_real32)
+        end function
+
+        real(kind=real64) function bytes_be_real_be_8(bytes)
+        ! converts bytes in big-endian to a real32 in big endian
+            byte, dimension(8), intent(in) :: bytes
+            bytes_be_real_be_8 = transfer([bytes(1), bytes(2), bytes(3), bytes(4), &
+                bytes(5), bytes(6), bytes(7), bytes(8)], 0_real64)
         end function
 
         integer(kind=int16) function bytes_be_to_int_2(bytes, e)
@@ -95,6 +123,31 @@ module byte_utilities
             end if
         end function
 
+        real(kind=real32) function bytes_be_to_real_4(bytes, e)
+        ! converts bytes in big-endian to a real32 based on requested endianness
+        ! @param[in] e - .true. for little endian, .false for big endian
+            byte, dimension(4), intent(in) :: bytes
+            logical, intent(in) :: e
+            if (e) then
+                bytes_be_to_real_4 = bytes_be_real_le_4(bytes)
+            else
+                bytes_be_to_real_4 = bytes_be_real_be_4(bytes)
+            end if
+        end function
+
+        real(kind=real64) function bytes_be_to_real_8(bytes, e)
+        ! converts bytes in big-endian to a real64 based on requested endianness
+        ! @param[in] e - .true. for little endian, .false for big endian
+            byte, dimension(8), intent(in) :: bytes
+            logical, intent(in) :: e
+            if (e) then
+                bytes_be_to_real_8 = bytes_be_real_le_8(bytes)
+            else
+                bytes_be_to_real_8 = bytes_be_real_be_8(bytes)
+            end if
+        end function
+
+        ! LITTLE ENDIAN ==> BIG ENDIAN bytes
         subroutine int_le_to_bytes_be_2(bytes, value)
         ! converts int16 little endian to bytes in big-endian
             byte, dimension(2), intent(inout) :: bytes
@@ -127,6 +180,22 @@ module byte_utilities
             bytes(8) = int(ibits(value,  0, 8), kind=int8)
         end subroutine
 
+        subroutine real_le_to_bytes_be_4(bytes, value)
+        ! convert real32 little endian to bytes in big-endian
+            byte, dimension(4), intent(inout) :: bytes
+            real(kind=real32), intent(in) :: value
+            bytes(4:1:-1) = transfer(value, [0_int8, 0_int8, 0_int8, 0_int8])
+        end subroutine
+
+        subroutine real_le_to_bytes_be_8(bytes, value)
+        ! convert real64 little endian to bytes in big-endian
+            byte, dimension(8), intent(inout) :: bytes
+            real(kind=real64), intent(in) :: value
+            bytes(8:1:-1) = transfer(value, [0_int8, 0_int8, 0_int8, 0_int8, &
+                0_int8, 0_int8, 0_int8, 0_int8])
+        end subroutine
+
+        ! BIG ENDIAN ==> BIG ENDIAN bytes
         subroutine int_be_to_bytes_be_2(bytes, value)
         ! converts int16 big endian to bytes in big-endian
             byte, dimension(2), intent(inout) :: bytes
@@ -145,6 +214,21 @@ module byte_utilities
         ! converts int64 big endian to bytes in big-endian
             byte, dimension(8), intent(inout) :: bytes
             integer(kind=int64), intent(in) :: value
+            bytes(1:8) = transfer(value, [0_int8, 0_int8, 0_int8, 0_int8, &
+                0_int8, 0_int8, 0_int8, 0_int8])
+        end subroutine
+
+        subroutine real_be_to_bytes_be_4(bytes, value)
+        ! converts real32 big endian to bytes in big-endian
+            byte, dimension(4), intent(inout) :: bytes
+            real(kind=real32), intent(in) :: value
+            bytes(1:4) = transfer(value, [0_int8, 0_int8, 0_int8, 0_int8])
+        end subroutine
+
+        subroutine real_be_to_bytes_be_8(bytes, value)
+        ! converts real64 big endian to bytes in big-endian
+            byte, dimension(8), intent(inout) :: bytes
+            real(kind=real64), intent(in) :: value
             bytes(1:8) = transfer(value, [0_int8, 0_int8, 0_int8, 0_int8, &
                 0_int8, 0_int8, 0_int8, 0_int8])
         end subroutine
@@ -182,6 +266,30 @@ module byte_utilities
                 call int_le_to_bytes_be_8(bytes, value)
             else
                 call int_be_to_bytes_be_8(bytes, value)
+            end if
+        end subroutine
+
+        subroutine real_to_bytes_be_4(bytes, value)
+        ! converts real32 to bytes in big-endian based on requested endianness
+        ! @param[in] e - .true. for little endian, .false. for big endian
+            byte, dimension(4), intent(inout) :: bytes
+            real(kind=real32), intent(in) :: value
+            if (detect_little_endian()) then
+                call real_le_to_bytes_be_4(bytes, value)
+            else
+                call real_be_to_bytes_be_4(bytes, value)
+            end if
+        end subroutine
+
+        subroutine real_to_bytes_be_8(bytes, value)
+        ! converts real32 to bytes in big-endian based on requested endianness
+        ! @param[in] e - .true. for little endian, .false. for big endian
+            byte, dimension(8), intent(inout) :: bytes
+            real(kind=real64), intent(in) :: value
+            if (detect_little_endian()) then
+                call real_le_to_bytes_be_8(bytes, value)
+            else
+                call real_be_to_bytes_be_8(bytes, value)
             end if
         end subroutine
 

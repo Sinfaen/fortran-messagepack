@@ -6,6 +6,7 @@ program packing
     ! variables to use
     class(mp_int_type), allocatable :: int_test
     class(mp_str_type), allocatable :: str_test
+    class(mp_arr_type), allocatable :: arr_test
     byte, allocatable, dimension(:) :: buf
     character(:), allocatable :: small_text
     integer :: i
@@ -96,5 +97,30 @@ program packing
     deallocate(str_test)
     deallocate(small_text)
     print *, "[Info: Str8 packing test succeeded"
+
+    ! fixarray test
+    arr_test = mp_arr_type(4)
+    arr_test%value(1)%obj = new_real32(32.1)
+    arr_test%value(2)%obj = new_real64(-2.03_8)
+    arr_test%value(3)%obj = mp_str_type("mochi")
+    arr_test%value(4)%obj = mp_bool_type(.true.)
+    call pack_alloc(arr_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack fixarray"
+        stop 1
+    end if
+    ! expect 22 bytes
+    if (size(buf) == 22) then
+        if (buf(1) /= ior(MP_FA_L, 4)) then
+            print *, "[Error: failed to pack fixarray. byte(1): ", buf(1), "expected: ", ior(MP_FA_L, 4)
+            stop 1
+        end if
+    else
+        print *, "[Error: failed to pack fixarray correctly. Size: ", size(buf)
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(arr_test)
+    print *, "[Info: Fixarray packing test succeeded"
 
 end program

@@ -141,8 +141,19 @@ module messagepack_unpack
             case (MP_E32)
                 print *, "Ext32"
             case (MP_F32)
-                mpv = new_real32(0.0)
+                ! 4 bytes following
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = new_real32(bytes_be_to_real_4(buffer(2:5), is_little_endian))
             case (MP_F64)
+                ! 8 bytes following
+                if (.not. check_length_and_print(9, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = new_real64(bytes_be_to_real_8(buffer(2:9), is_little_endian))
             ! Unsigned integers >>>
             ! need to watch when grabbed values are negative
             case (MP_U8)
