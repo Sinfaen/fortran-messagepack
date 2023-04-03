@@ -76,6 +76,9 @@ module messagepack_value
 
     type, extends(mp_value_type) :: mp_nil_type
         ! nothing here
+    contains
+        procedure :: getsize => get_size_nil
+        procedure :: pack => pack_nil
     end type
 
     type, extends(mp_value_type) :: mp_bool_type
@@ -177,6 +180,12 @@ module messagepack_value
             class(mp_value_type) :: obj
             ne_1 = 1
         end function
+
+        subroutine get_size_nil(this, osize)
+            class(mp_nil_type) :: this
+            integer(kind=int64), intent(out) :: osize
+            osize = 1
+        end subroutine
 
         subroutine get_size_bool(this, osize)
             class(mp_bool_type) :: this
@@ -367,6 +376,20 @@ module messagepack_value
             logical, intent(out) :: error
             print *, "[Error: abstract pack function called"
             error = .true. ! this function should never be called
+        end subroutine
+
+        subroutine pack_nil(this, buf, error)
+            class(mp_nil_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            if (size(buf) < 1) then
+                error = .true.
+                return
+            end if
+
+            buf(1) = MP_NIL
+            error = .false.
         end subroutine
 
         subroutine pack_bool(this, buf, error)
