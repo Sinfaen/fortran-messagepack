@@ -60,6 +60,7 @@ module messagepack_value
     public :: new_real32, new_real64
     public :: get_int, set_unsigned, is_unsigned
     public :: get_str
+    public :: get_arr_size
 
     type :: mp_value_type
         ! nothing here
