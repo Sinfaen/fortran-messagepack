@@ -60,6 +60,7 @@ module messagepack_value
     public :: new_real32, new_real64
     public :: get_int, set_unsigned, is_unsigned
     public :: get_str
+    public :: get_arr_size
 
     type :: mp_value_type
         ! nothing here
@@ -70,7 +71,7 @@ module messagepack_value
 
     ! pointer handler for container types
     type :: mp_value_type_ptr
-        class(mp_value_type), pointer :: obj
+        class(mp_value_type), allocatable :: obj
     end type
 
     type, extends(mp_value_type) :: mp_nil_type
@@ -351,7 +352,7 @@ module messagepack_value
             if (this%value < 0) then
                 if (this%value >= -32) then
                     ! negative fixint
-                    buf(1) = int(-32, kind=int8) - this%value
+                    buf(1) = int(-32 - this%value, kind=int8)
                 else if (this%value >= -128) then
                     ! int8
                     buf(1) = MP_I8
@@ -623,17 +624,12 @@ module messagepack_value
             end if
         end function new_bin
 
-        type(mp_arr_type) function new_arr(arg, stat)
-            class(mp_value_type_ptr), allocatable, dimension(:) :: arg
-            logical, intent(out) :: stat
-            integer :: l
-            new_arr%value = arg
-            l = size(new_arr%value)
-            if (l > 2147483647_int64) then
-                stat = .false. ! too long
-            else
-                stat = .true.
+        type(mp_arr_type) function new_arr(length)
+            integer, intent(in) :: length ! number of elements to allocate
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated array with size greater than packing allows"
             end if
+            allocate(new_arr%value(length))
         end function new_arr
 
         type(mp_map_type) function new_map(keys, values, stat)
@@ -699,4 +695,9 @@ module messagepack_value
                 stat = .false.
             end select
         end subroutine
+
+        integer function get_arr_size(obj)
+            class(mp_arr_type), intent(in) :: obj
+            get_arr_size = size(obj%value)
+        end function
 end module
