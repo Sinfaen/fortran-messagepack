@@ -47,6 +47,19 @@ end program
 ## API
 All MsgPack classes extend from `mp_value_type`. Container types utilize `mp_value_type_ptr` as a wrapper around the polymorphic type.
 
+```fortran
+type :: mp_value_type_ptr
+    class(mp_value_type), allocatable :: obj
+end type
+```
+
+The `mp_value_type` contains the following type-bound procedures:
+| Procedure | Applies To | Functionality |
+| -- | -- | -- |
+| numelements | `mp_arr_type` | Returns number of contained elements. For non-containers, returns 1 |
+| getsize | All | Returns number of bytes taken up by the object |
+| pack | All | Internal use only |
+
 ### Nil
 The underlying support class is `mp_nil_type`.
 
@@ -63,6 +76,14 @@ The underlying support class is `mp_str_type`.
 The underlying support class is `mp_arr_type`.
 
 The constructor of the same name accepts a length argument. The `set_arr` function is used to pass `mp_value_type` pointers into the container.
+
+```fortran
+type, extends(mp_value_type) :: mp_arr_type
+    class(mp_value_type_ptr), allocatable, dimension(:) :: value
+contains
+    ...
+end type
+```
 
 #### Packing Considerations
 The length restriction of `(2^32)-1` is only checked for at pack time.

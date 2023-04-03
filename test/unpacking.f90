@@ -5,7 +5,9 @@ program unpacking
     ! variables to use
     byte, allocatable, dimension(:) :: stream ! buffer of bytes
     class(mp_value_type), allocatable :: mpv  ! pointer to value
+    integer :: i
     integer(kind=int64) :: itmp
+    integer(kind=int64), dimension(3) :: i_a_3
     character(:), allocatable :: stmp
     logical :: stat
 
@@ -136,5 +138,50 @@ program unpacking
         stop 1
     end if
     print *, "[Info: Fixstr test succeeded"
+
+    ! fixarray test: 3 elements
+    ! - positive fix int = 12
+    ! - negative fix int = -3
+    ! - int 16 =  32,000 0x7d00
+    ! 1 + 1 + 1 + 3 = 6 bytes
+    allocate(stream(6))
+    stream(1) = ior(MP_FA_L, 3) ! fixarray byte mark
+    stream(2) = 12  ! positive fix int
+    stream(3) = -29 ! negative fix int: 0b11100011 as int8
+    stream(4) = MP_I16 ! int 16 byte mark
+    stream(5) = 125 ! 0x7d
+    stream(6) = 0   ! 0x00
+    call unpack_stream(stream, mpv, stat)
+    deallocate(stream)
+    if (.not.(stat)) then
+        print *, "[Error: issue occurred with unpacking stream"
+        stop 1
+    end if
+    ! check length of the array
+    i_a_3 = (/12, -3, 32000/)
+    if (mpv%numelements() /= 3) then
+        print *, "[Error: unpacked fixarray contains ", itmp, " elements instead of 3"
+        stop 1
+    end if
+    select type (mpv)
+    type is (mp_value_type)
+    class is (mp_arr_type)
+        ! loop over all elements
+        do i = 1,3
+            if (.not. is_int(mpv%value(i)%obj)) then
+                print *, "[Error: fixarray[", i, "] is not an int"
+                stop 1
+            end if
+            call get_int(mpv%value(i)%obj, itmp, stat)
+            if (itmp /= i_a_3(i)) then
+                print *, "[Error: unpacked ", itmp, "instead of", i_a_3(i), "for fixarray > ", i
+            end if
+        end do
+    class default
+        print *, "[Error: did not unpack mp_arr_type"
+        stop 1
+    end select
+    deallocate(mpv)
+    print *, "[Info: Fixarray test succeeded"
 
 end program

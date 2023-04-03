@@ -60,13 +60,13 @@ module messagepack_value
     public :: new_real32, new_real64
     public :: get_int, set_unsigned, is_unsigned
     public :: get_str
-    public :: get_arr_size
 
     type :: mp_value_type
         ! nothing here
     contains
         procedure :: getsize => get_size_1
         procedure :: pack => pack_value
+        procedure :: numelements => ne_1
     end type
 
     ! pointer handler for container types
@@ -134,6 +134,7 @@ module messagepack_value
         class(mp_value_type_ptr), allocatable, dimension(:) :: value
     contains
         procedure :: getsize => get_size_arr
+        procedure :: numelements => get_arr_size
     end type
     interface mp_arr_type
         procedure :: new_arr
@@ -142,7 +143,7 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_map_type
         class(mp_value_type_ptr), allocatable, dimension(:) :: keys
         class(mp_value_type_ptr), allocatable, dimension(:) :: values
-        integer :: numelements
+        integer :: ne
     contains
         procedure :: getsize => get_size_map
     end type
@@ -166,6 +167,11 @@ module messagepack_value
             integer(kind=int64), intent(out) :: osize
             osize = 1
         end subroutine
+
+        integer function ne_1(obj)
+            class(mp_value_type) :: obj
+            ne_1 = 1
+        end function
 
         subroutine get_size_int(this, osize)
             class(mp_int_type) :: this
@@ -287,9 +293,9 @@ module messagepack_value
 
             integer(kind=int64) keysize, valuesize, i
             ! set initialsize
-            if (this%numelements <= 15) then
+            if (this%ne <= 15) then
                 osize = 1 ! fixmap
-            else if (this%numelements <= 65535) then
+            else if (this%ne <= 65535) then
                 osize = 3 ! map16
             else
                 osize = 5 ! map32
@@ -297,7 +303,7 @@ module messagepack_value
             ! TODO handle errors for larger
 
             ! get sizes of all contained values
-            do i = 1, this%numelements
+            do i = 1, this%ne
                 call this%keys(i)%obj%getsize(keysize)
                 call this%values(i)%obj%getsize(valuesize)
                 osize = osize + keysize + valuesize
@@ -697,7 +703,7 @@ module messagepack_value
         end subroutine
 
         integer function get_arr_size(obj)
-            class(mp_arr_type), intent(in) :: obj
+            class(mp_arr_type) :: obj
             get_arr_size = size(obj%value)
         end function
 end module
