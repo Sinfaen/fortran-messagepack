@@ -281,7 +281,7 @@ module messagepack_unpack
                     return
                 end if
                 ! check that the remaining number of bytes exist
-                val_int32 = bytes_be_to_int_4(buffer(2:53), is_little_endian)
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
                 if (5 + val_int64 > length) then
                     successful = .false.
@@ -295,7 +295,67 @@ module messagepack_unpack
                 mpv = mp_str_type(val_char)
                 byteadvance = 1_int64 + val_int64
             case (MP_A16)
+                ! 3 bytes for header
+                if (.not. check_length_and_print(3, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                if (.not. check_length_and_print(1 + val_int16, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_arr_type(val_int16 + 0)
+                byteadvance = 2 ! start at next object
+                do i = 1,val_int16
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+
+                    ! store the newly unpacked object into the array
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_arr_type)
+                        mpv%value(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+                end do
             case (MP_A32)
+                ! 5 bytes for header
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
+                if (.not. check_length_and_print(1 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_arr_type(val_int32)
+                byteadvance = 2 ! start at next object
+                do i = 1,val_int32
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+
+                    ! store the newly unpacked object into the array
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_arr_type)
+                        mpv%value(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+                end do
             case (MP_M16)
             case (MP_M32)
             case (MP_NFI_L:MP_NFI_H)

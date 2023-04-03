@@ -7,11 +7,13 @@ Utilizes OOP.
 - Fortran 2008
 - `meson` build system (only one supported for now)
 
-## Supported DataTypes
-- Signed Integers
-- Unsigned Integers
-    - exception: values between 2^63 & 2^64 - 1
-- Strings
+## Supported Formats
+- Nil Format Family
+- Int Format Family
+- Float Format Family
+- Bool Format Family
+- String Format Family
+- Array Format Family
 
 ## Examples
 
@@ -63,14 +65,42 @@ The `mp_value_type` contains the following type-bound procedures:
 ### Nil
 The underlying support class is `mp_nil_type`.
 
+```fortran
+function is_nil(obj) result(res)
+! @returns whether the object is `mp_nil_type`
+```
+
 ### Integer Format Family
 The underlying support class is `mp_int_type`.
+
+```fortran
+function is_int(obj) result(res)
+! @returns whether the object is a `mp_int_type`
+
+subroutine get_int(obj, val, stat)
+! @param[out] val - integer to store decoded value
+! @param[out] stat - Returns false if the object is not `mp_int_type`
+```
 
 ### Float Format Family
 The underlying support class is `mp_float_type`.
 
+```fortran
+function is_float(obj) result(res)
+! @returns whether the object is a `mp_float_type`
+```
+
 ### String Format Family
 The underlying support class is `mp_str_type`.
+
+```fortran
+function is_str(obj) result(res)
+! @returns whether the object is a `mp_str_type`
+
+subroutine get_str(obj, val, stat)
+! @param[out] val - character(:), allocatable
+! @param[out] stat - Returns false if the object is not `mp_str_type`
+```
 
 ### Array Format Family
 The underlying support class is `mp_arr_type`.
@@ -83,6 +113,27 @@ type, extends(mp_value_type) :: mp_arr_type
 contains
     ...
 end type
+```
+
+Related Functions
+```fortran
+function is_arr(obj) result(res)
+! @returns whether the object is a `mp_arr_type`
+```
+
+Example of accessing contained values
+```fortran
+mp_arr_type :: arr_obj
+integer, dimension(3) :: decoded
+logical :: status
+! arr_obj is pre-populated with 3 ints
+do i = 1,3
+    get_int(arr_obj%value(i)%obj, decoded(i), status)
+    if (.not. status) then
+        ! error handling
+    end if
+end do
+print *, "Decoded:", decoded
 ```
 
 #### Packing Considerations
