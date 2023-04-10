@@ -77,7 +77,45 @@ module messagepack_unpack
                 ! the byte itself is the value
                 mpv = mp_int_type(buffer(1))
             case (MP_FM_L:MP_FM_H)
-                print *, "Fixmap"
+                btemp1 = 0
+                call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixmap length
+                if (.not. check_length_and_print(1 + btemp1, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_map_type(btemp1 + 0)
+                byteadvance = 2 ! start at next object
+                do i = 1,btemp1
+                    ! get key
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%keys(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+
+                    ! get value
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%values(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+                end do
             case (MP_FA_L:MP_FA_H)
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixarray length
@@ -147,6 +185,7 @@ module messagepack_unpack
                     return
                 end if
                 mpv = new_real32(bytes_be_to_real_4(buffer(2:5), is_little_endian))
+                byteadvance = 5
             case (MP_F64)
                 ! 8 bytes following
                 if (.not. check_length_and_print(9, length)) then
@@ -154,6 +193,7 @@ module messagepack_unpack
                     return
                 end if
                 mpv = new_real64(bytes_be_to_real_8(buffer(2:9), is_little_endian))
+                byteadvance = 9
             ! Unsigned integers >>>
             ! need to watch when grabbed values are negative
             case (MP_U8)
@@ -307,7 +347,7 @@ module messagepack_unpack
                     return
                 end if
                 mpv = mp_arr_type(val_int16 + 0)
-                byteadvance = 2 ! start at next object
+                byteadvance = 4 ! start at next object
                 do i = 1,val_int16
                     call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
                     byteadvance = byteadvance + i_64
@@ -338,7 +378,7 @@ module messagepack_unpack
                     return
                 end if
                 mpv = mp_arr_type(val_int32)
-                byteadvance = 2 ! start at next object
+                byteadvance = 6 ! start at next object
                 do i = 1,val_int32
                     call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
                     byteadvance = byteadvance + i_64
@@ -357,7 +397,95 @@ module messagepack_unpack
                     end select
                 end do
             case (MP_M16)
+                ! 3 bytes for header
+                if (.not. check_length_and_print(3, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                if (.not. check_length_and_print(1 + val_int16, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_map_type(val_int16 + 0)
+                byteadvance = 4 ! start at next object
+                do i = 1,val_int16
+                    ! get key
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%keys(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+
+                    ! get value
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%values(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+                end do
             case (MP_M32)
+                ! 5 bytes for header
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
+                if (.not. check_length_and_print(1 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_map_type(val_int32 + 0)
+                byteadvance = 6 ! start at next object
+                do i = 1,val_int32
+                    ! get key
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%keys(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+
+                    ! get value
+                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
+                    byteadvance = byteadvance + i_64
+                    if (.not. successful) then
+                        return
+                    end if
+                    select type (mpv)
+                    type is (mp_value_type)
+                    class is (mp_map_type)
+                        mpv%values(i)%obj = val_any
+                    class default
+                        successful = .false.
+                        print *, "[Error: something went terribly wrong"
+                    end select
+                end do
             case (MP_NFI_L:MP_NFI_H)
                 ! take the first 5 bits, create a negative value from it
                 btemp1 = ibits(buffer(1), 0, 5)

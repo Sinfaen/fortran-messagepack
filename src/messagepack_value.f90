@@ -58,8 +58,8 @@ module messagepack_value
     public :: mp_arr_type, mp_map_type, mp_ext_type
     public :: is_nil, is_bool, is_int, is_float, is_str, is_bin, is_arr, is_map, is_ext
     public :: new_real32, new_real64
-    public :: get_int, set_unsigned, is_unsigned
-    public :: get_str
+    public :: set_unsigned, is_unsigned
+    public :: get_bool, get_int, get_real, get_str, get_arr_ref, get_map_ref
 
     type :: mp_value_type
         ! nothing here
@@ -154,6 +154,8 @@ module messagepack_value
         integer :: ne
     contains
         procedure :: getsize => get_size_map
+        procedure :: numelements => get_map_size
+        procedure :: pack => pack_map
     end type
     interface mp_map_type
         procedure :: new_map
@@ -260,6 +262,20 @@ module messagepack_value
                 get_arr_type = MP_A32
             else
                 get_arr_type = MP_NU ! bad
+            end if
+        end function
+
+        integer function get_map_type(length)
+            ! get type of map based on length of the map
+            integer(kind=int64), intent(in) :: length
+            if (length <= 15) then
+                get_map_type = int(ior(MP_FM_L, int(length)), kind=int8)
+            else if (length <= 65535) then
+                get_map_type = MP_M16
+            else if (length <= 4294967295_int64) then
+                get_map_type = MP_M32
+            else
+                get_map_type = MP_NU ! bad
             end if
         end function
 
@@ -549,7 +565,7 @@ module messagepack_value
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
             integer :: arrtype
-            integer :: writeindex
+            integer(kind=int64) :: writeindex
             integer(kind=int64) :: i
             call this%getsize(length)
             if (length > size(buf)) then
@@ -564,19 +580,70 @@ module messagepack_value
 
             select case(arrtype)
             case (MP_FA_L:MP_FA_H)
-                writeindex = 1
+                writeindex = 2
             case (MP_A16)
-                writeindex = 3
+                writeindex = 4
                 call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
             case (MP_A32)
-                writeindex = 5
+                writeindex = 6
                 call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
             end select
             do i = 1,length
-                call this%value(i)%obj%pack(buf(writeindex +i:), error)
+                call this%value(i)%obj%pack(buf(writeindex:), error)
+                call this%value(i)%obj%getsize(length)
+                writeindex = writeindex + length
                 if (error) then
                     return
                 end if
+            end do
+
+            error = .false.
+        end subroutine
+
+        recursive subroutine pack_map(this, buf, error)
+            class(mp_map_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer :: maptype
+            integer(kind=int64) :: writeindex
+            integer(kind=int64) :: i
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize values
+            length = this%numelements()
+            maptype = get_map_type(length)
+            buf(1) = int(maptype, kind=int8) ! write marker
+
+            select case(maptype)
+            case (MP_FM_L:MP_FM_H)
+                writeindex = 2
+            case (MP_M16)
+                writeindex = 4
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+            case (MP_M32)
+                writeindex = 6
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            end select
+            do i = 1,length
+                call this%keys(i)%obj%pack(buf(writeindex:), error)
+                if (error) then
+                    return
+                end if
+                call this%keys(i)%obj%getsize(length)
+                writeindex = writeindex + length
+                call this%values(i)%obj%pack(buf(writeindex:), error)
+                if (error) then
+                    return
+                end if
+                call this%values(i)%obj%getsize(length)
+                writeindex = writeindex + length
             end do
 
             error = .false.
@@ -771,23 +838,15 @@ module messagepack_value
             allocate(new_arr%value(length))
         end function new_arr
 
-        type(mp_map_type) function new_map(keys, values, stat)
-            class(mp_value_type_ptr), allocatable, dimension(:) :: keys
-            class(mp_value_type_ptr), allocatable, dimension(:) :: values
-            logical, intent(out) :: stat
-            integer :: l
+        type(mp_map_type) function new_map(length)
+            integer, intent(in) :: length ! number of elements to allocate
 
-            l = size(keys)
-            stat = .true.
-            if (l /= size(values)) then
-                stat = .false.
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated map with size greater than packing allows"
             end if
-            if (l > 2147483647_int64) then
-                stat = .false.
-            end if
-
-            new_map%keys   = keys
-            new_map%values = values
+            allocate(new_map%keys(length))
+            allocate(new_map%values(length))
+            new_map%ne = length
         end function new_map
 
         type(mp_ext_type) function new_ext(exttype, data, stat)
@@ -803,6 +862,22 @@ module messagepack_value
             stat = (l <= 2147483647_int64)
         end function new_ext
 
+        subroutine get_bool(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            logical, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is (mp_value_type)
+            class is (mp_bool_type)
+                val = obj%value
+                stat = .true.
+            class default
+                val = .false.
+                stat = .false.
+            end select
+        end subroutine
+
         subroutine get_int(obj, val, stat)
             class(mp_value_type), intent(in) :: obj
             integer(kind=int64), intent(out) :: val
@@ -812,6 +887,26 @@ module messagepack_value
             type is (mp_value_type)
             class is (mp_int_type)
                 val = obj%value
+                stat = .true.
+            class default
+                val  = 0
+                stat = .false.
+            end select
+        end subroutine
+
+        subroutine get_real(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            real(kind=real64), intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type (obj)
+            type is (mp_value_type)
+            class is (mp_float_type)
+                if (obj%is_64) then
+                    val = obj%f64value
+                else
+                    val = obj%f32value
+                end if
                 stat = .true.
             class default
                 val  = 0
@@ -835,8 +930,43 @@ module messagepack_value
             end select
         end subroutine
 
+        subroutine get_arr_ref(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            class(mp_arr_type), allocatable, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is(mp_value_type)
+            class is (mp_arr_type)
+                val = obj
+                stat = .true.
+            class default
+                stat = .false.
+            end select
+        end subroutine
+
+        subroutine get_map_ref(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            class(mp_map_type), allocatable, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is(mp_value_type)
+            class is (mp_map_type)
+                val = obj
+                stat = .true.
+            class default
+                stat = .false.
+            end select
+        end subroutine
+
         integer function get_arr_size(obj)
             class(mp_arr_type) :: obj
             get_arr_size = size(obj%value)
+        end function
+
+        integer function get_map_size(obj)
+            class(mp_map_type) :: obj
+            get_map_size = obj%ne
         end function
 end module

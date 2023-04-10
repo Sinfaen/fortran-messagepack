@@ -7,6 +7,8 @@ program packing
     class(mp_int_type), allocatable :: int_test
     class(mp_str_type), allocatable :: str_test
     class(mp_arr_type), allocatable :: arr_test
+    class(mp_map_type), allocatable :: map_test
+
     byte, allocatable, dimension(:) :: buf
     character(:), allocatable :: small_text
     integer :: i
@@ -122,5 +124,35 @@ program packing
     deallocate(buf)
     deallocate(arr_test)
     print *, "[Info: Fixarray packing test succeeded"
+
+    ! fixmap test
+    arr_test = mp_arr_type(1)
+    arr_test%value(1)%obj = mp_str_type("a")
+
+    map_test = mp_map_type(3)
+    map_test%keys(1)%obj   = new_real32(21.1)
+    map_test%values(1)%obj = mp_bool_type(.false.)
+    map_test%keys(2)%obj   = new_real64(74.1_real64)
+    map_test%values(2)%obj = mp_nil_type()
+    map_test%keys(3)%obj   = mp_int_type(3)
+    map_test%values(3)%obj = arr_test
+    call pack_alloc(map_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack fixmap"
+        stop 1
+    end if
+    ! expect 21 bytes
+    if (size(buf) == 21) then
+        if (buf(1) /= ior(MP_FM_L, 3)) then
+            print *, "[Error: failed to pack fixmap. byte(1): ", buf(1), "expected: ", ior(MP_FM_L, 3)
+            stop 1
+        end if
+    else
+        print *, "[Error: failed to pack fixmap correctly. Size: ", size(buf)
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(map_test)
+    print *, "[Info: Fixmap packing test succeeded"
 
 end program

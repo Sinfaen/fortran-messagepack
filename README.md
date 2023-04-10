@@ -88,6 +88,10 @@ The underlying support class is `mp_float_type`.
 ```fortran
 function is_float(obj) result(res)
 ! @returns whether the object is a `mp_float_type`
+
+subroutine get_real(obj, val, stat)
+! @param[out] val - real64 to store decoded value
+! @param[out] stat - Returns false if the object is not `mp_float_type`
 ```
 
 ### String Format Family
@@ -105,11 +109,12 @@ subroutine get_str(obj, val, stat)
 ### Array Format Family
 The underlying support class is `mp_arr_type`.
 
-The constructor of the same name accepts a length argument. The `set_arr` function is used to pass `mp_value_type` pointers into the container.
+The constructor of the same name accepts a length argument.
 
 ```fortran
 type, extends(mp_value_type) :: mp_arr_type
     class(mp_value_type_ptr), allocatable, dimension(:) :: value
+    ...
 contains
     ...
 end type
@@ -119,6 +124,12 @@ Related Functions
 ```fortran
 function is_arr(obj) result(res)
 ! @returns whether the object is a `mp_arr_type`
+
+subroutine get_arr_ref(obj, val, stat)
+! Turn a generic `mp_value_type` into a `mp_arr_type`
+! @param[in] obj - class(mp_value_type), allocatable 
+! @param[out] val - class(mp_arr_type), allocatable
+! @param[out] stat - Returns false if the object is not `mp_arr_type`
 ```
 
 Example of accessing contained values
@@ -138,6 +149,33 @@ print *, "Decoded:", decoded
 
 #### Packing Considerations
 The length restriction of `(2^32)-1` is only checked for at pack time.
+
+### Map Format Family
+The underlying support class is `mp_map_type`.
+
+The constructor of the same name accepts a length argument.
+
+```fortran
+type, extends(mp_value_type) :: mp_map_type
+    class(mp_value_type_ptr), allocatable, dimension(:) :: keys
+    class(mp_value_type_ptr), allocatable, dimension(:) :: values
+    ...
+contains
+    ...
+end type
+```
+
+Related Functions
+```fortran
+function is_map(obj) result(res)
+! @returns whether the object is a `mp_map_type`
+
+subroutine get_map_ref(obj, val, stat)
+! Turn a generic `mp_value_type` into a `mp_map_type`
+! @param[in] obj - class(mp_value_type), allocatable 
+! @param[out] val - class(mp_map_type), allocatable
+! @param[out] stat - Returns false if the object is not `mp_map_type`
+```
 
 ## TODO
 - lots and lots
