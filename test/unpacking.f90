@@ -5,13 +5,14 @@ program unpacking
     ! variables to use
     byte, allocatable, dimension(:) :: stream ! buffer of bytes
     class(mp_value_type), allocatable :: mpv  ! pointer to value
-    integer :: i
+    integer :: i, i_tmp
     logical :: btmp
     integer(kind=int64) :: itmp
     real(kind=real64) :: rtmp
     integer(kind=int64), dimension(3) :: i_a_3
     integer(kind=int64), dimension(2) :: i_a_2
     character(:), allocatable :: stmp
+    byte, dimension(:), allocatable :: byte_tmp
     class(mp_arr_type), allocatable :: arrtmp
     class(mp_map_type), allocatable :: maptmp
     logical :: status
@@ -239,7 +240,6 @@ program unpacking
         stop 1
     end if
 
-    !call print_messagepack(mpv)
     call get_map_ref(mpv, maptmp, status)
     if (.not. status) then
         print *, "[Error: did not unpack mp_map_type"
@@ -313,5 +313,99 @@ program unpacking
     end do
     deallocate(mpv)
     print *, "[Info: Fixmap test succeeded"
+
+    ! bin8 test
+    ! values = x
+    i_tmp = 30
+    allocate(stream(i_tmp + 2))
+    stream(1) = MP_B8
+    stream(2) = 30
+    do i = 1,i_tmp
+        stream(i + 2) = int(i, kind=int8)
+    end do
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(bin)"
+        stop 1
+    end if
+    ! check that binary was unpacked
+    if (.not. is_bin(mpv)) then
+        print *, "[Error: Did not unpack binary"
+        stop 1
+    end if
+    ! check length of the array
+    if (mpv%numelements() /= i_tmp) then
+        print *, "[Error: unpacked bin8 contains ", mpv%numelements(), " elements instead of", i_tmp
+        stop 1
+    end if
+
+    call get_bin(mpv, byte_tmp, status)
+    deallocate(mpv)
+    print *, "[Info: bin8 test succeeded"
+
+    ! bin16 test
+    ! values = x % 35
+    i_tmp = 60000 ! 0xea60
+    allocate(stream(i_tmp + 3))
+    stream(1) = MP_B16
+    stream(2) = -22 ! 0xea 
+    stream(3) =  96 ! 0x60
+    do i = 1,i_tmp
+        stream(i + 3) = int(modulo(i, 35), kind=int8)
+    end do
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(bin)"
+        stop 1
+    end if
+    ! check that binary was unpacked
+    if (.not. is_bin(mpv)) then
+        print *, "[Error: Did not unpack binary"
+        stop 1
+    end if
+    ! check length of the array
+    if (mpv%numelements() /= i_tmp) then
+        print *, "[Error: unpacked bin16 contains ", mpv%numelements(), " elements instead of", i_tmp
+        stop 1
+    end if
+
+    call get_bin(mpv, byte_tmp, status)
+    deallocate(mpv)
+    print *, "[Info: bin16 test succeeded"
+
+    ! bin32 test
+    ! values = (x%25) * (x%14)
+    i_tmp = 100000 ! 0x000186a0
+    allocate(stream(i_tmp + 5))
+    stream(1) = MP_B32
+    stream(2) = 0 ! 0x00
+    stream(3) = 1 ! 0x01
+    stream(4) = -122 ! 0x86
+    stream(5) = -96 ! 0xa0
+    do i = 1,i_tmp
+        stream(i + 5) = int(modulo(i, 25) * modulo(i, 14), kind=int8)
+    end do
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(bin)"
+        stop 1
+    end if
+    ! check that binary was unpacked
+    if (.not. is_bin(mpv)) then
+        print *, "[Error: Did not unpack binary"
+        stop 1
+    end if
+    ! check length of the array
+    if (mpv%numelements() /= i_tmp) then
+        print *, "[Error: unpacked bin32 contains ", mpv%numelements(), " elements instead of", i_tmp
+        stop 1
+    end if
+
+    call get_bin(mpv, byte_tmp, status)
+    deallocate(mpv)
+    print *, "[Info: bin32 test succeeded"
 
 end program

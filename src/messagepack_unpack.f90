@@ -123,7 +123,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(btemp1 + 0)
+                mpv = mp_arr_type(int(btemp1, kind=int64))
                 byteadvance = 2 ! start at next object
                 do i = 1,btemp1
                     call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
@@ -167,11 +167,74 @@ module messagepack_unpack
                 mpv = mp_bool_type(.true.)
             ! binary format family
             case (MP_B8)
-                print *, "Bin8"
+                ! 1 byte following
+                if (.not. check_length_and_print(2, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = int8_as_unsigned(buffer(2))
+                val_int64 = val_int32
+                if (.not. check_length_and_print(1 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(3:)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
             case (MP_B16)
-                print *, "Bin16"
+                ! 2 bytes following
+                if (.not. check_length_and_print(3, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                val_int64 = val_int32
+                if (.not. check_length_and_print(1 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(4:)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
             case (MP_B32)
-                print *, "Bin32"
+                ! 4 bytes following
+                if (.not. check_length_and_print(5, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
+                val_int64 = val_int32
+                if (.not. check_length_and_print(1 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(6:)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
             case (MP_E8)
                 print *, "Ext8"
             case (MP_E16)
@@ -346,7 +409,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(val_int16 + 0)
+                mpv = mp_arr_type(int(val_int16, kind=int64))
                 byteadvance = 4 ! start at next object
                 do i = 1,val_int16
                     call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
@@ -377,7 +440,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(val_int32)
+                mpv = mp_arr_type(int(val_int32, kind=int64))
                 byteadvance = 6 ! start at next object
                 do i = 1,val_int32
                     call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)

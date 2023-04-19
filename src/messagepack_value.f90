@@ -59,7 +59,7 @@ module messagepack_value
     public :: is_nil, is_bool, is_int, is_float, is_str, is_bin, is_arr, is_map, is_ext
     public :: new_real32, new_real64
     public :: set_unsigned, is_unsigned
-    public :: get_bool, get_int, get_real, get_str, get_arr_ref, get_map_ref
+    public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref
 
     type :: mp_value_type
         ! nothing here
@@ -132,6 +132,8 @@ module messagepack_value
         byte, allocatable, dimension(:) :: value
     contains
         procedure :: getsize => get_size_bin
+        procedure :: numelements => get_bin_size
+        procedure :: pack => pack_bin
     end type
     interface mp_bin_type
         procedure :: new_bin
@@ -557,6 +559,33 @@ module messagepack_value
             error = .false.
         end subroutine
 
+        subroutine pack_bin(this, buf, error)
+            class(mp_bin_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer :: bintype
+            integer(kind=int64) :: writeindex
+            integer(kind=int64) :: i
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize values
+            length = this%numelements()
+            bintype = get_arr_type(length)
+            buf(1) = int(bintype, kind=int8) ! write marker
+
+            ! copy values in
+            buf(2:1+length) = this%value
+
+            error = .false.
+        end subroutine
+
         recursive subroutine pack_arr(this, buf, error)
             class(mp_arr_type) :: this
             byte, dimension(:) :: buf
@@ -817,21 +846,16 @@ module messagepack_value
             new_str%value = arg
         end function new_str
 
-        type(mp_bin_type) function new_bin(arg, stat)
-            byte, allocatable, dimension(:) :: arg
-            logical, intent(out) :: stat
-            integer :: l
-            new_bin%value = arg
-            l = size(new_bin%value)
-            if (l > 2147483647_int64) then
-                stat = .false. ! too long
-            else
-                stat = .true.
+        type(mp_bin_type) function new_bin(length)
+            integer(kind=int64), intent(in) :: length ! number of elements to allocate
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated array with size greater than packing allows"
             end if
+            allocate(new_bin%value(length))
         end function new_bin
 
         type(mp_arr_type) function new_arr(length)
-            integer, intent(in) :: length ! number of elements to allocate
+            integer(kind=int64), intent(in) :: length ! number of elements to allocate
             if (length > 2147483647_int64) then
                 print *, "[Warning: Allocated array with size greater than packing allows"
             end if
@@ -930,6 +954,21 @@ module messagepack_value
             end select
         end subroutine
 
+        subroutine get_bin(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            byte, allocatable, dimension(:), intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is (mp_value_type)
+            class is (mp_bin_type)
+                val = obj%value
+                stat = .true.
+            class default
+                stat = .false.
+            end select
+        end subroutine
+
         subroutine get_arr_ref(obj, val, stat)
             class(mp_value_type), intent(in) :: obj
             class(mp_arr_type), allocatable, intent(out) :: val
@@ -959,6 +998,11 @@ module messagepack_value
                 stat = .false.
             end select
         end subroutine
+
+        integer function get_bin_size(obj)
+            class(mp_bin_type) :: obj
+            get_bin_size = size(obj%value)
+        end function
 
         integer function get_arr_size(obj)
             class(mp_arr_type) :: obj
