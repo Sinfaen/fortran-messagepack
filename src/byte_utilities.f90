@@ -311,7 +311,7 @@ module byte_utilities
             
             int16_as_unsigned = value
             if (value < 0) then
-                int16_as_unsigned = iand(int16_as_unsigned, 65536_int32)
+                int16_as_unsigned = iand(int16_as_unsigned, 65535_int32)
             end if
         end function
 
