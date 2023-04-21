@@ -28,7 +28,7 @@ program constructors
     arr_test%value(5)%obj = mp_arr_type(2_int64)
 
     ! map constructor test
-    map_test = mp_map_type(4)
+    map_test = mp_map_type(4_int64)
     map_test%keys(1)%obj   = mp_int_type(34)
     map_test%values(1)%obj = mp_str_type("tokay gecko")
     map_test%keys(2)%obj   = mp_int_type(10)

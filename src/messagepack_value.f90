@@ -568,7 +568,6 @@ module messagepack_value
             integer(kind=int64) :: length
             integer :: bintype
             integer(kind=int64) :: writeindex
-            integer(kind=int64) :: i
             call this%getsize(length)
             if (length > size(buf)) then
                 error = .true.
@@ -863,7 +862,7 @@ module messagepack_value
         end function new_arr
 
         type(mp_map_type) function new_map(length)
-            integer, intent(in) :: length ! number of elements to allocate
+            integer(kind=int64), intent(in) :: length ! number of elements to allocate
 
             if (length > 2147483647_int64) then
                 print *, "[Warning: Allocated map with size greater than packing allows"
