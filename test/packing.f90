@@ -101,7 +101,7 @@ program packing
     print *, "[Info: Str8 packing test succeeded"
 
     ! fixarray test
-    arr_test = mp_arr_type(4)
+    arr_test = mp_arr_type(4_int64)
     arr_test%value(1)%obj = new_real32(32.1)
     arr_test%value(2)%obj = new_real64(-2.03_8)
     arr_test%value(3)%obj = mp_str_type("mochi")
@@ -126,10 +126,10 @@ program packing
     print *, "[Info: Fixarray packing test succeeded"
 
     ! fixmap test
-    arr_test = mp_arr_type(1)
+    arr_test = mp_arr_type(1_int64)
     arr_test%value(1)%obj = mp_str_type("a")
 
-    map_test = mp_map_type(3)
+    map_test = mp_map_type(3_int64)
     map_test%keys(1)%obj   = new_real32(21.1)
     map_test%values(1)%obj = mp_bool_type(.false.)
     map_test%keys(2)%obj   = new_real64(74.1_real64)

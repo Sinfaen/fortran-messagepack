@@ -14,6 +14,8 @@ Utilizes OOP.
 - Bool Format Family
 - String Format Family
 - Array Format Family
+- Map Format Family
+- Bin Format Family
 
 ## Examples
 
@@ -104,6 +106,30 @@ function is_str(obj) result(res)
 subroutine get_str(obj, val, stat)
 ! @param[out] val - character(:), allocatable
 ! @param[out] stat - Returns false if the object is not `mp_str_type`
+```
+
+### Bin Format Family
+The underlying support class is `mp_bin_type`.
+
+The constructor of the same name accepts a length argument.
+
+```fortran
+type, extends(mp_value_type) :: mp_bin_type
+     byte, allocatable, dimension(:) :: value
+    ...
+contains
+    ...
+end type
+```
+
+Related Functions
+```fortran
+function is_bin(obj) result(res)
+! @returns whether the object is a `mp_bin_type`
+
+subroutine get_bin(obj, val, stat)
+! @param[out] val - byte, allocatable, dimension(:)
+! @param[out] stat - Returns false if the object is not `mp_bin_type`
 ```
 
 ### Array Format Family

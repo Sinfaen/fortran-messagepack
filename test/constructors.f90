@@ -9,6 +9,7 @@ program constructors
     type(mp_str_type)  :: str_test
     type(mp_arr_type)  :: arr_test
     type(mp_map_type)  :: map_test
+    type(mp_bin_type)  :: bin_test
 
     print *, 'Constructor Test'
 
@@ -19,15 +20,15 @@ program constructors
     str_test = mp_str_type("hello world")
 
     ! array contructor test
-    arr_test = mp_arr_type(5)
+    arr_test = mp_arr_type(5_int64)
     arr_test%value(1)%obj = mp_nil_type()
     arr_test%value(2)%obj = mp_bool_type(.true.)
     arr_test%value(3)%obj = mp_int_type(45)
     arr_test%value(4)%obj = new_real32(-51.4)
-    arr_test%value(5)%obj = mp_arr_type(2)
+    arr_test%value(5)%obj = mp_arr_type(2_int64)
 
     ! map constructor test
-    map_test = mp_map_type(4)
+    map_test = mp_map_type(4_int64)
     map_test%keys(1)%obj   = mp_int_type(34)
     map_test%values(1)%obj = mp_str_type("tokay gecko")
     map_test%keys(2)%obj   = mp_int_type(10)
@@ -36,4 +37,10 @@ program constructors
     map_test%values(3)%obj = mp_str_type("caiman")
     map_test%keys(4)%obj   = mp_int_type(1000)
     map_test%values(4)%obj = mp_nil_type()
+
+    ! binary constructor test
+    bin_test = mp_bin_type(3_int64)
+    bin_test%value(1) = 3
+    bin_test%value(2) = -2
+    bin_test%value(3) = 4
 end program
