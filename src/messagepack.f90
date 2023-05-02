@@ -25,7 +25,7 @@ contains
         class(mp_value_type), intent(in) :: obj
         integer, intent(in) :: indentation
         logical, intent(in) :: sameline
-        integer :: i, j
+        integer(kind=int64) :: i, j
 
         if (.not. sameline) then
             do i = 1,indentation

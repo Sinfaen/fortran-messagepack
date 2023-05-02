@@ -60,13 +60,14 @@ module messagepack_value
     public :: new_real32, new_real64
     public :: set_unsigned, is_unsigned
     public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref
+    public :: get_header_size_by_type
 
     type :: mp_value_type
         ! nothing here
     contains
         procedure :: getsize => get_size_1
         procedure :: pack => pack_value
-        procedure :: numelements => ne_1
+        procedure :: numelements => return_one
     end type
 
     ! pointer handler for container types
@@ -153,7 +154,7 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_map_type
         class(mp_value_type_ptr), allocatable, dimension(:) :: keys
         class(mp_value_type_ptr), allocatable, dimension(:) :: values
-        integer :: ne
+        integer(kind=int64) :: ne
     contains
         procedure :: getsize => get_size_map
         procedure :: numelements => get_map_size
@@ -180,9 +181,14 @@ module messagepack_value
             osize = 1
         end subroutine
 
-        integer function ne_1(obj)
+        integer function return_zero(obj)
             class(mp_value_type) :: obj
-            ne_1 = 1
+            return_zero = 0
+        end function
+
+        integer(kind=int64) function return_one(obj)
+            class(mp_value_type) :: obj
+            return_one = 1_int64
         end function
 
         subroutine get_size_nil(this, osize)
@@ -567,7 +573,6 @@ module messagepack_value
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
             integer :: bintype
-            integer(kind=int64) :: writeindex
             call this%getsize(length)
             if (length > size(buf)) then
                 error = .true.
@@ -998,18 +1003,43 @@ module messagepack_value
             end select
         end subroutine
 
-        integer function get_bin_size(obj)
+        integer(kind=int64) function get_bin_size(obj)
             class(mp_bin_type) :: obj
             get_bin_size = size(obj%value)
         end function
 
-        integer function get_arr_size(obj)
+        integer(kind=int64) function get_arr_size(obj)
             class(mp_arr_type) :: obj
             get_arr_size = size(obj%value)
         end function
 
-        integer function get_map_size(obj)
+        integer(kind=int64) function get_map_size(obj)
             class(mp_map_type) :: obj
             get_map_size = obj%ne
+        end function
+
+        integer function get_header_size_by_type(mp_type)
+            byte :: mp_type
+            select case(mp_type)
+            ! 1 byte header types
+            ! - all integers (except NFI PFI)
+            ! - both real types
+            ! - fixstr, fixarray, fixmap
+            case (MP_FM_L:MP_FS_H, MP_F32:MP_I64)
+                get_header_size_by_type = 1_int64
+            ! 2 byte header types
+            ! - bin8, str8
+            case (MP_B8, MP_S8)
+                get_header_size_by_type = 2_int64
+            ! 3 byte header types
+            case (MP_B16, MP_S16, MP_A16, MP_M16)
+                get_header_size_by_type = 3_int64
+            ! 5 byte header types
+            case (MP_B32, MP_S32, MP_A32, MP_M32)
+                get_header_size_by_type = 5_int64
+            case default
+                ! catches every other type
+                get_header_size_by_type = 0_int64
+            end select
         end function
 end module
