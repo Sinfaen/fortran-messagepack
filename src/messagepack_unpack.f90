@@ -56,6 +56,8 @@ module messagepack_unpack
             integer(kind=int16) :: val_int16
             integer(kind=int32) :: val_int32
             integer(kind=int64) :: val_int64
+
+            integer(kind=int64) :: header_size
             character(:), allocatable :: val_char
             class(mp_value_type), allocatable :: val_any
 
@@ -68,6 +70,13 @@ module messagepack_unpack
             if (length == 0) then
                 successful = .false.
                 print *, "Buffer is empty"
+                return
+            end if
+
+            ! check that the size for the entire header exists
+            header_size = get_header_size_by_type(buffer(1))
+            if (.not. check_length_and_print(header_size, length)) then
+                successful = .false.
                 return
             end if
 
@@ -168,11 +177,6 @@ module messagepack_unpack
                 mpv = mp_bool_type(.true.)
             ! binary format family
             case (MP_B8)
-                ! 1 byte following
-                if (.not. check_length_and_print(2_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int32 = int8_as_unsigned(buffer(2))
                 val_int64 = val_int32
@@ -191,11 +195,6 @@ module messagepack_unpack
                     print *, "[Error: something went terribly wrong"
                 end select
             case (MP_B16)
-                ! 2 bytes following
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
                 val_int64 = int16_as_unsigned(val_int16)
@@ -214,11 +213,6 @@ module messagepack_unpack
                     print *, "[Error: something went terribly wrong"
                 end select
             case (MP_B32)
-                ! 4 bytes following
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
@@ -342,11 +336,6 @@ module messagepack_unpack
             case (MP_FE8)
             case (MP_FE16)
             case (MP_S8)
-                ! 2 bytes for header
-                if (.not. check_length_and_print(2_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int16 = int8_as_unsigned(buffer(2))
                 if (.not. check_length_and_print(2_int64 + val_int16, length)) then
@@ -361,11 +350,6 @@ module messagepack_unpack
                 mpv = mp_str_type(val_char)
                 byteadvance = 1 + val_int16
             case (MP_S16)
-                ! 3 bytes for header
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
@@ -381,11 +365,6 @@ module messagepack_unpack
                 mpv = mp_str_type(val_char)
                 byteadvance = 1 + val_int32
             case (MP_S32)
-                ! 5 bytes for header
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
@@ -401,11 +380,6 @@ module messagepack_unpack
                 mpv = mp_str_type(val_char)
                 byteadvance = 1_int64 + val_int64
             case (MP_A16)
-                ! 3 bytes for header
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
@@ -433,11 +407,6 @@ module messagepack_unpack
                     end select
                 end do
             case (MP_A32)
-                ! 5 bytes for header
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
@@ -465,11 +434,6 @@ module messagepack_unpack
                     end select
                 end do
             case (MP_M16)
-                ! 3 bytes for header
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
@@ -511,11 +475,6 @@ module messagepack_unpack
                     end select
                 end do
             case (MP_M32)
-                ! 5 bytes for header
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    return
-                end if
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
