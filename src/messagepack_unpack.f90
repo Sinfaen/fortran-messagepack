@@ -59,7 +59,6 @@ module messagepack_unpack
 
             integer(kind=int64) :: header_size
             character(:), allocatable :: val_char
-            class(mp_value_type), allocatable :: val_any
 
             length = size(buffer)
 
@@ -102,25 +101,8 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(int(btemp1, kind=int64))
                 byteadvance = 2 ! start at next object
-                do i = 1,btemp1
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-
-                    ! store the newly unpacked object into the array
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_arr_type)
-                        mpv%value(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_array(btemp1 + 0_int64, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FS_L:MP_FS_H)
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 5, btemp1, 0) ! get fixstr length
@@ -356,25 +338,8 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(int(val_int32, kind=int64))
                 byteadvance = 4 ! start at next object
-                do i = 1,val_int16
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-
-                    ! store the newly unpacked object into the array
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_arr_type)
-                        mpv%value(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_array(int(val_int32, kind=int64), buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_A32)
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
@@ -383,25 +348,8 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_arr_type(val_int64)
                 byteadvance = 6 ! start at next object
-                do i = 1,val_int32
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-
-                    ! store the newly unpacked object into the array
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_arr_type)
-                        mpv%value(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_array(val_int64, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_M16)
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
@@ -428,6 +376,37 @@ module messagepack_unpack
                 mpv = mp_int_type(-btemp1)
             end select
         end subroutine
+
+        recursive subroutine unpack_array(length, buffer, byteadvance, is_little_endian, mpv, successful)
+            integer(kind=int64), intent(in) :: length
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            logical, intent(in) :: is_little_endian
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            integer(kind=int64) :: i, tmp
+            class(mp_value_type), allocatable :: val_any
+            mpv = mp_arr_type(length)
+            do i = 1,length
+                call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    return
+                end if
+
+                ! store the newly unpacked object into the array
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_arr_type)
+                    mpv%value(i)%obj = val_any
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+            end do
+        end subroutine
+
 
         recursive subroutine unpack_map(length, buffer, byteadvance, is_little_endian, mpv, successful)
             integer(kind=int64), intent(in) :: length
