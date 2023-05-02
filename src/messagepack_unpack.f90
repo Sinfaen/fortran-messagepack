@@ -93,39 +93,8 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_map_type(val_int64)
                 byteadvance = 2 ! start at next object
-                do i = 1,btemp1
-                    ! get key
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%keys(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-
-                    ! get value
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%values(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_map(val_int64, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FA_L:MP_FA_H)
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixarray length
@@ -441,39 +410,8 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_map_type(val_int32 + 0_int64)
                 byteadvance = 4 ! start at next object
-                do i = 1,val_int16
-                    ! get key
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%keys(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-
-                    ! get value
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%values(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_map(0_int64 + val_int32, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_M32)
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
@@ -482,43 +420,58 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                mpv = mp_map_type(val_int64)
                 byteadvance = 6 ! start at next object
-                do i = 1,val_int32
-                    ! get key
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%keys(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-
-                    ! get value
-                    call unpack_value(buffer(byteadvance:), i_64, is_little_endian, val_any, successful)
-                    byteadvance = byteadvance + i_64
-                    if (.not. successful) then
-                        return
-                    end if
-                    select type (mpv)
-                    type is (mp_value_type)
-                    class is (mp_map_type)
-                        mpv%values(i)%obj = val_any
-                    class default
-                        successful = .false.
-                        print *, "[Error: something went terribly wrong"
-                    end select
-                end do
+                call unpack_map(val_int64, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_NFI_L:MP_NFI_H)
                 ! take the first 5 bits, create a negative value from it
                 btemp1 = ibits(buffer(1), 0, 5)
                 mpv = mp_int_type(-btemp1)
             end select
+        end subroutine
+
+        recursive subroutine unpack_map(length, buffer, byteadvance, is_little_endian, mpv, successful)
+            integer(kind=int64), intent(in) :: length
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            logical, intent(in) :: is_little_endian
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            integer(kind=int64) :: i, tmp
+            class(mp_value_type), allocatable :: val_any
+
+            successful = .true.
+            mpv = mp_map_type(length)
+            do i = 1,length
+                ! get key
+                call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    return
+                end if
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_map_type)
+                    mpv%keys(i)%obj = val_any
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+
+                ! get value
+                call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    return
+                end if
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_map_type)
+                    mpv%values(i)%obj = val_any
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+            end do
         end subroutine
 end module
