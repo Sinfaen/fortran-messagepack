@@ -154,7 +154,7 @@ module messagepack_value
     type, extends(mp_value_type) :: mp_map_type
         class(mp_value_type_ptr), allocatable, dimension(:) :: keys
         class(mp_value_type_ptr), allocatable, dimension(:) :: values
-        integer :: ne
+        integer(kind=int64) :: ne
     contains
         procedure :: getsize => get_size_map
         procedure :: numelements => get_map_size
@@ -186,9 +186,9 @@ module messagepack_value
             return_zero = 0
         end function
 
-        integer function return_one(obj)
+        integer(kind=int64) function return_one(obj)
             class(mp_value_type) :: obj
-            return_one = 1
+            return_one = 1_int64
         end function
 
         subroutine get_size_nil(this, osize)
@@ -573,7 +573,6 @@ module messagepack_value
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
             integer :: bintype
-            integer(kind=int64) :: writeindex
             call this%getsize(length)
             if (length > size(buf)) then
                 error = .true.
@@ -1004,17 +1003,17 @@ module messagepack_value
             end select
         end subroutine
 
-        integer function get_bin_size(obj)
+        integer(kind=int64) function get_bin_size(obj)
             class(mp_bin_type) :: obj
             get_bin_size = size(obj%value)
         end function
 
-        integer function get_arr_size(obj)
+        integer(kind=int64) function get_arr_size(obj)
             class(mp_arr_type) :: obj
             get_arr_size = size(obj%value)
         end function
 
-        integer function get_map_size(obj)
+        integer(kind=int64) function get_map_size(obj)
             class(mp_map_type) :: obj
             get_map_size = obj%ne
         end function
