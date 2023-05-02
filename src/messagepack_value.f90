@@ -59,7 +59,7 @@ module messagepack_value
     public :: is_nil, is_bool, is_int, is_float, is_str, is_bin, is_arr, is_map, is_ext
     public :: new_real32, new_real64
     public :: set_unsigned, is_unsigned
-    public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref
+    public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref, get_ext_ref
     public :: get_header_size_by_type
 
     type :: mp_value_type
@@ -166,9 +166,11 @@ module messagepack_value
 
     type, extends(mp_value_type) :: mp_ext_type
         integer :: exttype
-        byte, allocatable, dimension(:) :: value
+        byte, allocatable, dimension(:) :: values
     contains
         procedure :: getsize => get_size_ext
+        procedure :: numelements => get_ext_size
+        procedure :: pack => pack_ext
     end type
     interface mp_ext_type
         procedure :: new_ext
@@ -287,6 +289,30 @@ module messagepack_value
             end if
         end function
 
+        integer function get_ext_type(length)
+            ! get type of extension based on the length
+            integer(kind=int64), intent(in) :: length
+            if (length == 1) then
+                get_ext_type = MP_FE1
+            else if (length == 2) then
+                get_ext_type = MP_FE2
+            else if (length == 4) then
+                get_ext_type = MP_FE4
+            else if (length == 8) then
+                get_ext_type = MP_FE8
+            else if (length == 16) then
+                get_ext_type = MP_FE16
+            else if (length <= 255) then
+                get_ext_type = MP_E8
+            else if (length <= 65535) then
+                get_ext_type = MP_E16
+            else if (length <= 4294967295_int64) then
+                get_ext_type = MP_E32
+            else
+                get_ext_type = MP_NU ! bad
+            end if
+        end function
+
         subroutine get_size_str(this, osize)
             class(mp_str_type)   :: this
             integer(kind=int64), intent(out) :: osize
@@ -373,7 +399,7 @@ module messagepack_value
             integer(kind=int64), intent(out) :: osize
             integer :: length
 
-            length = size(this%value)
+            length = size(this%values)
             if (length == 1) then
                 osize = 3 ! fixext1
             else if (length == 2) then
@@ -391,7 +417,6 @@ module messagepack_value
             else
                 osize = 6 + length ! ext32
             end if
-            ! TODO error handling
         end subroutine
 
         subroutine pack_value(this, buf, error)
@@ -682,6 +707,46 @@ module messagepack_value
             error = .false.
         end subroutine
 
+        subroutine pack_ext(this, buf, error)
+            class(mp_ext_type) :: this
+            byte, dimension(:) :: buf
+            logical, intent(out) :: error
+
+            ! check that the buffer can hold the required number of bytes
+            integer(kind=int64) :: length
+            integer(kind=int64) :: etype
+            call this%getsize(length)
+            if (length > size(buf)) then
+                error = .true.
+                return
+            end if
+
+            ! serialize data
+            length = this%numelements()
+            etype = get_ext_type(length)
+            buf(1) = int(etype, kind=int8) ! write marker
+
+            select case(etype)
+            case (MP_FE1, MP_FE2, MP_FE4, MP_FE8, MP_FE16)
+                buf(2) = int(this%exttype, kind=int8)
+                buf(3:3+length-1) = this%values
+            case (MP_E8)
+                buf(2) = length
+                buf(3) = int(this%exttype, kind=int8)
+                buf(4:4+length-1) = this%values
+            case (MP_E16)
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+                buf(4) = int(this%exttype, kind=int8)
+                buf(5:5+length-1) = this%values
+            case (MP_E32)
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+                buf(6) = int(this%exttype, kind=int8)
+                buf(7:7+length-1) = this%values
+            end select
+
+            error = .false.
+        end subroutine
+
         function is_nil(obj) result(res)
             class(mp_value_type), intent(in) :: obj
             logical :: res
@@ -877,17 +942,16 @@ module messagepack_value
             new_map%ne = length
         end function new_map
 
-        type(mp_ext_type) function new_ext(exttype, data, stat)
-            integer :: exttype
-            byte, allocatable, dimension(:) :: data
-            logical, intent(out) :: stat
-            integer :: l
+        type(mp_ext_type) function new_ext(etype, length)
+            integer, intent(in) :: etype
+            integer(kind=int64), intent(in) :: length ! number of elements to allocate
 
-            new_ext%exttype = exttype
-            new_ext%value   = data
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated ext with size greater than packing allows"
+            end if
 
-            l = size(new_ext%value)
-            stat = (l <= 2147483647_int64)
+            new_ext%exttype = etype
+            allocate(new_ext%values(length))
         end function new_ext
 
         subroutine get_bool(obj, val, stat)
@@ -1002,6 +1066,21 @@ module messagepack_value
                 stat = .false.
             end select
         end subroutine
+        
+        subroutine get_ext_ref(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            class(mp_ext_type), allocatable, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is (mp_value_type)
+            class is (mp_ext_type)
+                val = obj
+                stat = .true.
+            class default
+                stat = .false.
+            end select
+        end subroutine
 
         integer(kind=int64) function get_bin_size(obj)
             class(mp_bin_type) :: obj
@@ -1018,6 +1097,11 @@ module messagepack_value
             get_map_size = obj%ne
         end function
 
+        integer(kind=int64) function get_ext_size(obj)
+            class(mp_ext_type) :: obj
+            get_ext_size = size(obj%values)
+        end function
+
         integer function get_header_size_by_type(mp_type)
             byte :: mp_type
             select case(mp_type)
@@ -1029,14 +1113,19 @@ module messagepack_value
                 get_header_size_by_type = 1_int64
             ! 2 byte header types
             ! - bin8, str8
-            case (MP_B8, MP_S8)
+            ! - fixext types
+            case (MP_B8, MP_S8, MP_FE1:MP_FE16)
                 get_header_size_by_type = 2_int64
             ! 3 byte header types
-            case (MP_B16, MP_S16, MP_A16, MP_M16)
+            case (MP_B16, MP_S16, MP_A16, MP_M16, MP_E8)
                 get_header_size_by_type = 3_int64
+            case (MP_E16)
+                get_header_size_by_type = 4_int64
             ! 5 byte header types
             case (MP_B32, MP_S32, MP_A32, MP_M32)
                 get_header_size_by_type = 5_int64
+            case (MP_E32)
+                get_header_size_by_type = 6_int64
             case default
                 ! catches every other type
                 get_header_size_by_type = 0_int64
