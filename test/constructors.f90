@@ -10,6 +10,7 @@ program constructors
     type(mp_arr_type)  :: arr_test
     type(mp_map_type)  :: map_test
     type(mp_bin_type)  :: bin_test
+    type(mp_ext_type)  :: ext_test
 
     print *, 'Constructor Test'
 
@@ -43,4 +44,14 @@ program constructors
     bin_test%value(1) = 3
     bin_test%value(2) = -2
     bin_test%value(3) = 4
+
+    ! extension constructor test
+    ext_test = mp_ext_type(40, 7_int64)
+    ext_test%values(1) = 4
+    ext_test%values(2) = -100
+    ext_test%values(3) = 0
+    ext_test%values(4) = 99
+    ext_test%values(5) = 17
+    ext_test%values(6) = -34
+    ext_test%values(7) = -42
 end program
