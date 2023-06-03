@@ -16,6 +16,7 @@ Utilizes OOP.
 - Array Format Family
 - Map Format Family
 - Bin Format Family
+- Extension Format Family
 
 ## Examples
 
@@ -60,7 +61,7 @@ end type
 The `mp_value_type` contains the following type-bound procedures:
 | Procedure | Applies To | Functionality |
 | -- | -- | -- |
-| numelements | `mp_arr_type` | Returns number of contained elements. For non-containers, returns 1 |
+| numelements | `mp_arr_type`, `mp_map_type`, `mp_ext_type` | Returns number of contained elements. For the map it returns the number of pairs. For non-containers, returns 1 |
 | getsize | All | Returns number of bytes taken up by the object |
 | pack | All | Internal use only |
 
@@ -203,8 +204,35 @@ subroutine get_map_ref(obj, val, stat)
 ! @param[out] stat - Returns false if the object is not `mp_map_type`
 ```
 
+### Extension Format Family
+The underlying support class is `mp_ext_type`.
+
+The constructor of the same name accepts an extension type argument and length argument.
+
+```fortran
+type, extends(mp_value_type) :: mp_ext_type
+    integer :: exttype ! extension type
+    byte, allocatable, dimension(:) :: values
+contains
+    ...
+end type
+```
+
+Related Functions
+```fortran
+function is_ext(obj) result(res)
+! @returns whether the object is a `mp_ext_type`
+
+subroutine get_ext_ref(obj, val, stat)
+! Turn a generic `mp_value_type` into a `mp_ext_type`
+! @param[in] obj - class(mp_value_type), allocatable 
+! @param[out] val - class(mp_ext_type), allocatable
+! @param[out] stat - Returns false if the object is not `mp_ext_type`
+```
+
 ## TODO
-- lots and lots
+- customizable extensions
+   - timestamp data type
 
 ## Tests
 Tests integrated into Meson:
