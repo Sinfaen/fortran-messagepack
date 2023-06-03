@@ -9,6 +9,7 @@ module messagepack
     use messagepack_value
     use messagepack_pack
     use messagepack_unpack
+    use messagepack_user
     use byte_utilities
     implicit none
 contains
