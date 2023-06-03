@@ -182,11 +182,31 @@ module messagepack_unpack
                     print *, "[Error: something went terribly wrong"
                 end select
             case (MP_E8)
-                print *, "Ext8"
+                ! check for first 3 bytes
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(3)
+                call unpack_ext(int8_as_unsigned(buffer(2)) + 0_int64, i, buffer(4:), byteadvance, mpv, successful)
             case (MP_E16)
-                print *, "Ext16"
+                ! check for first 4 bytes
+                if (.not. check_length_and_print(4_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(4)
+                val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
+                call unpack_ext(val_int16 + 0_int64, i, buffer(5:), byteadvance, mpv, successful)
             case (MP_E32)
-                print *, "Ext32"
+                ! check for first 6 bytes
+                if (.not. check_length_and_print(6_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(6)
+                val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
+                call unpack_ext(val_int32 + 0_int64, i, buffer(7:), byteadvance, mpv, successful)
             case (MP_F32)
                 ! 4 bytes following
                 if (.not. check_length_and_print(5_int64, length)) then
@@ -282,10 +302,50 @@ module messagepack_unpack
                 byteadvance = 9
             ! ext format family
             case (MP_FE1)
+                ! 3 bytes following
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call unpack_ext(1_int64, i, buffer(3:), byteadvance, mpv, successful)
             case (MP_FE2)
+                ! 4 bytes following
+                if (.not. check_length_and_print(4_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call unpack_ext(2_int64, i, buffer(3:), byteadvance, mpv, successful)
             case (MP_FE4)
+                ! 6 bytes following
+                if (.not. check_length_and_print(6_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call unpack_ext(4_int64, i, buffer(3:), byteadvance, mpv, successful)
             case (MP_FE8)
+                ! 8 bytes following
+                if (.not. check_length_and_print(8_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call unpack_ext(8_int64, i, buffer(3:), byteadvance, mpv, successful)
             case (MP_FE16)
+                ! 18 bytes following
+                if (.not. check_length_and_print(18_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call unpack_ext(16_int64, i, buffer(3:), byteadvance, mpv, successful)
             case (MP_S8)
                 ! check that the remaining number of bytes exist
                 val_int16 = int8_as_unsigned(buffer(2))
@@ -407,7 +467,6 @@ module messagepack_unpack
             end do
         end subroutine
 
-
         recursive subroutine unpack_map(length, buffer, byteadvance, is_little_endian, mpv, successful)
             integer(kind=int64), intent(in) :: length
             byte, dimension(:), intent(in) :: buffer
@@ -452,5 +511,31 @@ module messagepack_unpack
                     print *, "[Error: something went terribly wrong"
                 end select
             end do
+        end subroutine
+
+        subroutine unpack_ext(length, etype, buffer, byteadvance, mpv, successful)
+            integer(kind=int64), intent(in) :: length
+            integer, intent(in) :: etype
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            if (length > size(buffer)) then
+                successful = .false.
+                return
+            end if
+
+            mpv = mp_ext_type(etype, length)
+            successful = .true.
+            select type(mpv)
+            type is (mp_value_type)
+            class is (mp_ext_type)
+                mpv%values = buffer(1:length)
+                byteadvance = byteadvance + length
+            class default
+                successful = .false.
+                print *, "[Error: something went terribly wrong"
+            end select
         end subroutine
 end module

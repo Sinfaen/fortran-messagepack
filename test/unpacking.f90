@@ -15,6 +15,7 @@ program unpacking
     byte, dimension(:), allocatable :: byte_tmp
     class(mp_arr_type), allocatable :: arrtmp
     class(mp_map_type), allocatable :: maptmp
+    class(mp_ext_type), allocatable :: exttmp
     logical :: status
 
     print *, "Unpacking test"
@@ -407,5 +408,322 @@ program unpacking
     call get_bin(mpv, byte_tmp, status)
     deallocate(mpv)
     print *, "[Info: bin32 test succeeded"
+
+    ! fixext1 test
+    ! type = 4
+    ! values = [2]
+    allocate(stream(3))
+    stream(1) = MP_FE1
+    stream(2) = 4 ! type
+    stream(3) = 2 ! data
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 1) then
+        print *, "[Error: unpacked fixext1 contains ", mpv%numelements(), " elements instead of 1"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 4) then
+        print *, "[Error: unpacked fixext1 has type ", exttmp%exttype, " instead of expected type 4"
+        stop 1
+    end if
+    if (exttmp%values(1) /= 2) then
+        print *, "[Error: unpacked fixext1 has unexpected data"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: fixext1 test succeeded"
+
+    ! fixext2 test
+    ! type = -5
+    ! values = [-1, -2]
+    allocate(stream(4))
+    stream(1) = MP_FE2
+    stream(2) = -5 ! type
+    stream(3) = -1 ! data
+    stream(4) = -2
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 2) then
+        print *, "[Error: unpacked fixext2 contains ", mpv%numelements(), " elements instead of 1"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= -5) then
+        print *, "[Error: unpacked fixext2 has type ", exttmp%exttype, " instead of expected type -5"
+        stop 1
+    end if
+    if (exttmp%values(1) /= -1 .or. exttmp%values(2) /= -2) then
+        print *, "[Error: unpacked fixext2 has unexpected data"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: fixext2 test succeeded"
+
+    ! fixext4 test
+    ! type = 100
+    ! values = [0, 10, 100, -20]
+    allocate(stream(6))
+    stream(1) = MP_FE4
+    stream(2) = 100 ! type
+    stream(3) = 0 ! data
+    stream(4) = 10
+    stream(5) = 100
+    stream(6) = -20
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 4) then
+        print *, "[Error: unpacked fixext4 contains ", mpv%numelements(), " elements instead of 4"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 100) then
+        print *, "[Error: unpacked fixext4 has type ", exttmp%exttype, " instead of expected type 100"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: fixext4 test succeeded"
+
+    ! fixext8 test
+    ! type = 127
+    ! values = [1, 2, 3, 4, 5, 6, 7, 8]
+    allocate(stream(10))
+    stream(1) = MP_FE8
+    stream(2) = 127 ! type
+    do i = 1,8
+        stream(2+i) = int(i, kind=int8)
+    end do
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 8) then
+        print *, "[Error: unpacked fixext8 contains ", mpv%numelements(), " elements instead of 8"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 127) then
+        print *, "[Error: unpacked fixext8 has type ", exttmp%exttype, " instead of expected type 127"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: fixext8 test succeeded"
+
+    ! fixext16 test
+    ! type = 127
+    ! values = [-1, -2, ...., -16]
+    allocate(stream(18))
+    stream(1) = MP_FE16
+    stream(2) = -128 ! type
+    do i = 1,16
+        stream(2+i) = int(-i, kind=int8)
+    end do
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 16) then
+        print *, "[Error: unpacked fixext16 contains ", mpv%numelements(), " elements instead of 16"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= -128) then
+        print *, "[Error: unpacked fixext16 has type ", exttmp%exttype, " instead of expected type -128"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: fixext16 test succeeded"
+
+    ! ext8 test
+    ! type = 17
+    ! values = [1, 2, 3]
+    allocate(stream(6))
+    stream(1) = MP_E8
+    stream(2) = 3
+    stream(3) = 17
+    stream(4) = 1
+    stream(5) = 2
+    stream(6) = 3
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 3) then
+        print *, "[Error: unpacked ext8 contains ", mpv%numelements(), " elements instead of 3"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 17) then
+        print *, "[Error: unpacked ext8 has type ", exttmp%exttype, " instead of expected type 17"
+        stop 1
+    end if
+    if (.not. all(exttmp%values .eq. (/1,2,3/))) then
+        print *, "[Error: unpacked ext8 does not contain expected data"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: ext8 test succeeded"
+
+    ! ext16 test
+    ! type = 23
+    ! values: [400 ... 1] N = 400 (0x0190)
+    allocate(stream(404))
+    stream(1) = MP_E16
+    stream(2) = 1    ! 0x01
+    stream(3) = -112 ! 0x90
+    stream(4) = 23
+    do i = 1,400
+        stream(4 + i) = int(401 - i, kind=int8)
+    end do
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 400) then
+        print *, "[Error: unpacked ext16 contains ", mpv%numelements(), " elements instead of 400"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 23) then
+        print *, "[Error: unpacked ext16 has type ", exttmp%exttype, " instead of expected type 23"
+        stop 1
+    end if
+    do i = 1,400
+        if (exttmp%values(i) /= int(401 - i, kind=int8)) then
+            print *, "[Error: unpacked ext16 does not contain expected data"
+            stop 1
+        end if
+    end do
+
+    deallocate(mpv)
+    print *, "[Info: ext16 test succeeded"
+
+    ! ext32 test
+    ! type = 100
+    ! values: [400 ... 1] N = 80000 (0x00013880)
+    allocate(stream(80006))
+    stream(1) = MP_E32
+    stream(2) = 0    ! 0x00
+    stream(3) = 1    ! 0x01
+    stream(4) = 56   ! 0x38
+    stream(5) = -128 ! 0x80
+    stream(6) = 100
+    do i = 1,80000
+        stream(6 + i) = int(modulo(i, 3_int8), kind=int8)
+    end do
+
+    call unpack_stream(stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(ext)"
+        stop 1
+    end if
+    ! check that ext was unpacked
+    if (.not. is_ext(mpv)) then
+        print *, "[Error: Did not unpack extension"
+        stop 1
+    end if
+    ! check length of data
+    if (mpv%numelements() /= 80000) then
+        print *, "[Error: unpacked ext32 contains ", mpv%numelements(), " elements instead of 80000"
+        stop 1
+    end if
+    ! check type and data
+    call get_ext_ref(mpv, exttmp, status)
+    if (exttmp%exttype /= 100) then
+        print *, "[Error: unpacked ext32 has type ", exttmp%exttype, " instead of expected type 100"
+        stop 1
+    end if
+    do i = 1,80000
+        if (exttmp%values(i) /= modulo(i, 3_int8)) then
+            print *, "[Error: unpacked ext32 does not contain expected data"
+            stop 1
+        end if
+    end do
+
+    deallocate(mpv)
+    print *, "[Info: ext32 test succeeded"
 
 end program
