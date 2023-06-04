@@ -452,6 +452,7 @@ module messagepack_unpack
                 call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
+                    deallocate(mpv)
                     return
                 end if
 
@@ -462,6 +463,7 @@ module messagepack_unpack
                     mpv%value(i)%obj = val_any
                 class default
                     successful = .false.
+                    deallocate(mpv)
                     print *, "[Error: something went terribly wrong"
                 end select
             end do
@@ -485,6 +487,7 @@ module messagepack_unpack
                 call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
+                    deallocate(mpv)
                     return
                 end if
                 select type (mpv)
@@ -493,6 +496,7 @@ module messagepack_unpack
                     mpv%keys(i)%obj = val_any
                 class default
                     successful = .false.
+                    deallocate(mpv)
                     print *, "[Error: something went terribly wrong"
                 end select
 
@@ -500,6 +504,7 @@ module messagepack_unpack
                 call unpack_value(buffer(byteadvance:), tmp, is_little_endian, val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
+                    deallocate(mpv)
                     return
                 end if
                 select type (mpv)
@@ -508,6 +513,7 @@ module messagepack_unpack
                     mpv%values(i)%obj = val_any
                 class default
                     successful = .false.
+                    deallocate(mpv)
                     print *, "[Error: something went terribly wrong"
                 end select
             end do
@@ -535,6 +541,7 @@ module messagepack_unpack
                 byteadvance = byteadvance + length
             class default
                 successful = .false.
+                deallocate(mpv)
                 print *, "[Error: something went terribly wrong"
             end select
         end subroutine
