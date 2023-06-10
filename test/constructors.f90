@@ -12,6 +12,8 @@ program constructors
     type(mp_bin_type)  :: bin_test
     type(mp_ext_type)  :: ext_test
 
+    type(mp_timestamp_type) :: timestamp_test
+
     print *, 'Constructor Test'
 
     nil_test  = mp_nil_type()
@@ -54,4 +56,7 @@ program constructors
     ext_test%values(5) = 17
     ext_test%values(6) = -34
     ext_test%values(7) = -42
+
+    ! timestamp test
+    timestamp_test = mp_timestamp_type(14, 100023)
 end program
