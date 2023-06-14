@@ -11,7 +11,7 @@ module messagepack_user
     private
 
     public :: mp_settings, unpack_func, unpack_callback
-    public :: mp_timestamp_type, register_extension
+    public :: mp_timestamp_type, is_timestamp, get_timestamp_ref, register_extension
 
     integer, parameter, public :: MP_TS_EXT = -1
     
@@ -42,6 +42,14 @@ module messagepack_user
         class(unpack_callback), allocatable, dimension(:) :: e8
         class(unpack_callback), allocatable, dimension(:) :: e16
         class(unpack_callback), allocatable, dimension(:) :: e32
+        logical, dimension(256) :: f1_allocated
+        logical, dimension(256) :: f2_allocated
+        logical, dimension(256) :: f4_allocated
+        logical, dimension(256) :: f8_allocated
+        logical, dimension(256) :: f16_allocated
+        logical, dimension(256) :: e8_allocated
+        logical, dimension(256) :: e16_allocated
+        logical, dimension(256) :: e32_allocated
     contains
         procedure :: register_extension
         procedure :: register_extension_super
@@ -67,6 +75,7 @@ module messagepack_user
         type(mp_settings) function new_settings()
             logical :: err
             procedure(unpack_func), pointer :: p
+            integer :: i
             allocate(new_settings%f1(256))
             allocate(new_settings%f2(256))
             allocate(new_settings%f4(256))
@@ -75,6 +84,16 @@ module messagepack_user
             allocate(new_settings%e8(256))
             allocate(new_settings%e16(256))
             allocate(new_settings%e32(256))
+            do i = 1,256
+                new_settings%f1_allocated = .false.
+                new_settings%f2_allocated = .false.
+                new_settings%f4_allocated = .false.
+                new_settings%f8_allocated = .false.
+                new_settings%f16_allocated = .false.
+                new_settings%e8_allocated = .false.
+                new_settings%e16_allocated = .false.
+                new_settings%e32_allocated = .false.
+            end do
 
             ! add timestamp here
             p => unpack_timestamp_32
@@ -82,14 +101,14 @@ module messagepack_user
             p => unpack_timestamp_64
             call new_settings%register_extension_super(MP_FE8, -1_int8, p, err)
             p => unpack_timestamp_96
-            call new_settings%register_extension_super(MP_FE8, -1_int8, p, err)
+            call new_settings%register_extension_super(MP_E8, -1_int8, p, err)
         end function
 
         type(mp_timestamp_type) function new_timestamp(sec, ns)
             integer(kind=int64) :: sec
             integer(kind=int64) :: ns
             new_timestamp%seconds     = sec
-            new_timestamp%nanoseconds = ns
+            new_timestamp%nanoseconds = abs(ns)
         end function
 
         subroutine register_extension(this, ext, typeid, cb, error)
@@ -124,20 +143,28 @@ module messagepack_user
             select case(ext)
             case (MP_FE1)
                 this%f1(arr_index)%cb => cb
+                this%f1_allocated(arr_index) = .true.
             case (MP_FE2)
                 this%f2(arr_index)%cb => cb
+                this%f2_allocated(arr_index) = .true.
             case (MP_FE4)
                 this%f4(arr_index)%cb => cb
+                this%f4_allocated(arr_index) = .true.
             case (MP_FE8)
                 this%f8(arr_index)%cb => cb
+                this%f8_allocated(arr_index) = .true.
             case (MP_FE16)
                 this%f16(arr_index)%cb => cb
+                this%f16_allocated(arr_index) = .true.
             case (MP_E8)
                 this%e8(arr_index)%cb => cb
+                this%e8_allocated(arr_index) = .true.
             case (MP_E16)
                 this%e16(arr_index)%cb => cb
+                this%e16_allocated(arr_index) = .true.
             case (MP_E32)
                 this%e32(arr_index)%cb => cb
+                this%e16_allocated(arr_index) = .true.
             end select
 
             error = .false.
@@ -146,10 +173,12 @@ module messagepack_user
         subroutine get_size_timestamp(this, osize)
             class(mp_timestamp_type) :: this
             integer(kind=int64), intent(out) :: osize
-            if (this%nanoseconds == 0 .and. this%seconds <= 4294967296_int64) then
+            if (this%nanoseconds == 0 .and. this%seconds <= 4294967296_int64 .and. &
+                    this%seconds >= 0) then
                 osize = 6  ! timestamp32
-            else if (this%nanoseconds <= 1073741824_int64 &
-                .and. this%seconds <= 17179869184_int64) then
+            else if (this%nanoseconds  <=  1073741824_int64 &
+                    .and. this%seconds <= 17179869184_int64 &
+                    .and. this%seconds >= 0) then
                 ! nanoseconds fit into uint30, seconds fit into uint34
                 osize = 10 ! timestamp32
             else
@@ -202,12 +231,11 @@ module messagepack_user
 
             integer(kind=int32) :: temp
 
-            if (size(buffer(byteadvance:)) < 6) then
+            if (size(buffer(byteadvance:)) < 4) then
                 successful = .false.
                 return
             end if
 
-            byteadvance = byteadvance + 2
             temp = bytes_be_to_int_4(buffer(byteadvance:byteadvance+3), is_little_endian)
             mpv = mp_timestamp_type(temp, 0)
             byteadvance = byteadvance + 3
@@ -224,13 +252,14 @@ module messagepack_user
 
             integer(kind=int64) :: temp, temp1, temp2
 
-            if (size(buffer(byteadvance:)) < 10) then
+            if (size(buffer(byteadvance:)) < 8) then
                 successful = .false.
                 return
             end if
-            
-            byteadvance = byteadvance + 2
+
             temp = bytes_be_to_int_8(buffer(byteadvance:byteadvance+7), is_little_endian)
+            temp1 = 0
+            temp2 = 0
             call mvbits(temp, 0, 34, temp1, 0)
             call mvbits(temp, 34, 30, temp2, 0)
             mpv = mp_timestamp_type(temp1, temp2)
@@ -249,22 +278,45 @@ module messagepack_user
             integer(kind=int32) :: temp
             integer(kind=int64) :: temp2
 
-            if (size(buffer(byteadvance:)) < 15) then
-                successful = .false.
-                return
-            end if
-            if (buffer(byteadvance + 1) /= 12) then
+            if (size(buffer(byteadvance:)) /= 12) then
                 successful = .false.
                 return
             end if
 
-            byteadvance = byteadvance + 2
             temp = bytes_be_to_int_4(buffer(byteadvance:byteadvance+3), is_little_endian)
             byteadvance = byteadvance + 4
             temp2 = bytes_be_to_int_8(buffer(byteadvance:byteadvance+7), is_little_endian)
             mpv = mp_timestamp_type(temp2, temp)
-            byteadvance = byteadvance + 7
+            byteadvance = byteadvance + 8
 
             successful = .true.
+        end subroutine
+
+        function is_timestamp(obj) result(res)
+            class(mp_value_type), intent(in) :: obj
+            logical :: res
+
+            select type(obj)
+            type is(mp_value_type)
+            class is (mp_timestamp_type)
+                res = .true.
+            class default
+                res = .false.
+            end select
+        end function is_timestamp
+
+        subroutine get_timestamp_ref(obj, val, stat)
+            class(mp_value_type), intent(in) :: obj
+            class(mp_timestamp_type), allocatable, intent(out) :: val
+            logical, intent(out) :: stat
+
+            select type(obj)
+            type is (mp_value_type)
+            class is (mp_timestamp_type)
+                val = obj
+                stat = .true.
+            class default
+                stat = .false.
+            end select
         end subroutine
 end module

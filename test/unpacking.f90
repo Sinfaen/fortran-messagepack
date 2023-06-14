@@ -17,6 +17,7 @@ program unpacking
     class(mp_arr_type), allocatable :: arrtmp
     class(mp_map_type), allocatable :: maptmp
     class(mp_ext_type), allocatable :: exttmp
+    class(mp_timestamp_type), allocatable :: ts_tmp
     logical :: status
 
     print *, "Unpacking test"
@@ -727,5 +728,118 @@ program unpacking
 
     deallocate(mpv)
     print *, "[Info: ext32 test succeeded"
+
+    ! extension testing
+    ! timestamp32 test
+    ! 300 seconds => 0x0000012c
+    allocate(stream(6))
+    stream(1) = MP_FE4
+    stream(2) = -1_int8
+    stream(3) = 0  ! 0x00
+    stream(4) = 0  ! 0x00
+    stream(5) = 1  ! 0x01
+    stream(6) = 44 ! 0x2c
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp32)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= 300 .or. ts_tmp%nanoseconds /= 0) then
+        print *, "[Error: unpacked timestamp32: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected 300s"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: timestamp32 test succeeded"
+
+    ! timestamp64 test
+    ! 2^30 seconds, 2^5 ns
+    ! 0x00000080 40000000  this is hard to calculate
+    allocate(stream(10))
+    stream(1) = MP_FE8
+    stream(2) = -1_int8
+    stream(3) = 0 ! 0x00
+    stream(4) = 0 ! 0x00
+    stream(5) = 0 ! 0x00
+    stream(6) = -128 ! 0x80
+    stream(7) = 64 ! 0x40
+    stream(8) = 0 ! 0x00
+    stream(9) = 0 ! 0x00
+    stream(10) = 0 ! 0x00
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp64)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= 1073741824_int64 .or. &
+            ts_tmp%nanoseconds /= 32) then
+        print *, "[Error: unpacked timestamp64: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected 1073741824 seconds, 32 ns"
+        stop 1
+    end if
+
+    print *, "[Info: timestamp64 test succeeded"
+
+    ! timestamp96 test
+    ! -200 seconds, 30 ns
+    ! 0x0000001e
+    ! 0xffffffffffffff38
+    allocate(stream(15))
+    stream(1)  = MP_E8
+    stream(2)  = 12
+    stream(3)  = -1
+    stream(4)  = 0  ! 0x00
+    stream(5)  = 0  ! 0x00
+    stream(6)  = 0  ! 0x00
+    stream(7)  = 30 ! 0x1e
+    stream(8)  = -1 ! 0xff
+    stream(9)  = -1 ! 0xff
+    stream(10) = -1 ! 0xff
+    stream(11) = -1 ! 0xff
+    stream(12) = -1 ! 0xff
+    stream(13) = -1 ! 0xff
+    stream(14) = -1 ! 0xff
+    stream(15) = 56 ! 0x38
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp96)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= -200 .or. &
+            ts_tmp%nanoseconds /= 30) then
+        print *, "[Error: unpacked timestamp64: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected -200 seconds, 30 ns"
+        stop 1
+    end if
+
+    print *, "[Info: timestamp96 test succeeded"
 
 end program

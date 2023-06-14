@@ -194,8 +194,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(3)
+                byteadvance = 4
                 call unpack_ext(settings, int8_as_unsigned(buffer(2)) + 0_int64, &
-                    i, buffer(4:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_E16)
                 ! check for first 4 bytes
                 if (.not. check_length_and_print(4_int64, length)) then
@@ -203,9 +204,10 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(4)
+                byteadvance = 5
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
                 call unpack_ext(settings, val_int16 + 0_int64, &
-                    i, buffer(5:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_E32)
                 ! check for first 6 bytes
                 if (.not. check_length_and_print(6_int64, length)) then
@@ -213,9 +215,10 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(6)
+                byteadvance = 7
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
                 call unpack_ext(settings, val_int32 + 0_int64, &
-                    i, buffer(7:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_F32)
                 ! 4 bytes following
                 if (.not. check_length_and_print(5_int64, length)) then
@@ -317,9 +320,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 2
+                byteadvance = 3
                 call unpack_ext(settings, 1_int64, &
-                    i, buffer(3:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FE2)
                 ! 4 bytes following
                 if (.not. check_length_and_print(4_int64, length)) then
@@ -327,9 +330,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 2
+                byteadvance = 3
                 call unpack_ext(settings, 2_int64, &
-                    i, buffer(3:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FE4)
                 ! 6 bytes following
                 if (.not. check_length_and_print(6_int64, length)) then
@@ -337,9 +340,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 2
+                byteadvance = 3
                 call unpack_ext(settings, 4_int64, &
-                    i, buffer(3:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FE8)
                 ! 8 bytes following
                 if (.not. check_length_and_print(8_int64, length)) then
@@ -347,9 +350,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 2
+                byteadvance = 3
                 call unpack_ext(settings, 8_int64, &
-                    i, buffer(3:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_FE16)
                 ! 18 bytes following
                 if (.not. check_length_and_print(18_int64, length)) then
@@ -357,9 +360,9 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 2
+                byteadvance = 3
                 call unpack_ext(settings, 16_int64, &
-                    i, buffer(3:), byteadvance, is_little_endian, mpv, successful)
+                    i, buffer, byteadvance, is_little_endian, mpv, successful)
             case (MP_S8)
                 ! check that the remaining number of bytes exist
                 val_int16 = int8_as_unsigned(buffer(2))
@@ -556,7 +559,6 @@ module messagepack_unpack
             logical, intent(out) :: successful
 
             integer :: ind
-
             if (length > size(buffer)) then
                 successful = .false.
                 return
@@ -565,22 +567,52 @@ module messagepack_unpack
             ! Custom extension handling
             ind = etype + 128
             if (length == 1) then
-                if (associated(settings%f1(ind)%cb)) then
+                if (settings%f1_allocated(ind)) then
                     call settings%f1(ind)%cb(buffer, byteadvance, &
                         is_little_endian, mpv, successful)
                     return
                 end if
             else if (length == 2) then
-                if (associated(settings%f2(ind)%cb)) then
+                if (settings%f2_allocated(ind)) then
                     call settings%f2(ind)%cb(buffer, byteadvance, &
                         is_little_endian, mpv, successful)
                     return
                 end if
             else if (length == 4) then
-                if (associated(settings%f4(ind)%cb)) then
+                if (settings%f4_allocated(ind)) then
                     call settings%f4(ind)%cb(buffer, byteadvance, &
                         is_little_endian, mpv, successful)
                     return
+                end if
+            else if (length == 8) then
+                if (settings%f8_allocated(ind)) then
+                    call settings%f8(ind)%cb(buffer, byteadvance, &
+                        is_little_endian, mpv, successful)
+                    return
+                end if
+            else if (length == 16) then
+                if (settings%f16_allocated(ind)) then
+                    call settings%f16(ind)%cb(buffer, byteadvance, &
+                        is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 256) then
+                if (settings%e8_allocated(ind)) then
+                    call settings%e8(ind)%cb(buffer, byteadvance, &
+                        is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 65536) then
+                if (settings%e16_allocated(ind)) then
+                    call settings%e16(ind)%cb(buffer, byteadvance, &
+                        is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 4294967296_int64) then
+                if (settings%e32_allocated(ind)) then
+                    call settings%e32(ind)%cb(buffer, byteadvance, &
+                        is_little_endian, mpv, successful)
+                        return
                 end if
             end if
 
@@ -590,7 +622,7 @@ module messagepack_unpack
             select type(mpv)
             type is (mp_value_type)
             class is (mp_ext_type)
-                mpv%values = buffer(1:length)
+                mpv%values = buffer(byteadvance:byteadvance+length-1)
                 byteadvance = byteadvance + length
             class default
                 successful = .false.
