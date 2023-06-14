@@ -7,17 +7,6 @@ Utilizes OOP.
 - Fortran 2008
 - `meson` build system (only one supported for now)
 
-## Supported Formats
-- Nil Format Family
-- Int Format Family
-- Float Format Family
-- Bool Format Family
-- String Format Family
-- Array Format Family
-- Map Format Family
-- Bin Format Family
-- Extension Format Family
-
 ## Examples
 
 ### Unpacking
@@ -30,21 +19,55 @@ program test
     byte, allocatable, dimension(:) :: buffer
 
     ! base class used to interact with MsgPack
-    class(mp_value_type), allocatable :: mp_deserialized
+    class(mp_value_type), allocatable :: mp_value
+    ! object used to store various settings
+    class(mp_settings), allocatable :: mps
     logical :: error ! error flag
 
     integer :: unpacked_value
 
-    call unpack_stream(buffer, mp_deserialized, error)
+    mps = mp_settings() ! get default settings
+
+    call unpack_stream(mps, buffer, mp_value, error)
     if (error) then
-        Print *, "Failed to read MsgPack data"
+        ! insert error handling here
         stop 1
     end if
 
-    if (is_int(mp_deserialized)) then
-        call get_int(mp_deserialized, unpacked_value, error)
+    if (is_int(mp_value)) then
+        call get_int(mp_value, unpacked_value, error)
         write(*,*) "Unpacked: ", unpacked_value
     end if
+
+end program
+```
+
+### Packing
+```fortran
+program test
+    use messagepack
+    use iso_fortran_env
+    implicit none
+
+    ! buffer to fill with MsgPack data
+    byte, allocatable, dimension(:) :: buffer
+    logical :: error ! error flag
+
+    ! create an array with two elements:
+    ! ["hello world", .false.]
+    class(mp_arr_type), allocatable :: mp_arr
+    mp_arr = mp_arr_type(2_int64)
+    mp_arr%value(1)%obj = mp_str_type("hello world")
+    mp_arr%value(2)%obj = mp_bool_type(.false.)
+
+    ! pack the value into a dynamically allocated array
+    call pack_alloc(buffer, mp_deserialized, error)
+    if (error) then
+        ! insert error handling here
+        stop 1
+    end if
+    print *, buffer ! output to console
+    deallocate(buffer)
 
 end program
 ```
@@ -230,9 +253,36 @@ subroutine get_ext_ref(obj, val, stat)
 ! @param[out] stat - Returns false if the object is not `mp_ext_type`
 ```
 
-## TODO
-- customizable extensions
-   - timestamp data type
+## Built-In Extensions
+
+### Timestamp
+The underlying support class is `mp_timestamp_type`.
+
+The constructor of the same name accepts a seconds & nanoseconds argument. The nanoseconds argument must be positive.
+
+This type does not have any built datetime support. It is merely a vehicle to serialize/deserialize a unix timestamp to/from messagepack.
+
+```fortran
+type, extends(mp_value_type) :: mp_timestamp_type
+    integer(kind=int64) :: seconds
+    integer(kind=int64) :: nanoseconds ! this must be positive
+    ...
+contains
+    ...
+end type
+```
+
+Related Functions
+```fortran
+function is_timestamp(obj) result(res)
+! @returns whether the object is a `mp_timestamp_type`
+
+subroutine get_timestamp_ref(obj, val, stat)
+! Turn a generic `mp_value_type` into a `mp_timestamp_type`
+! @param[in] obj - class(mp_value_type), allocatable 
+! @param[out] val - class(mp_timestamp_type), allocatable
+! @param[out] stat - Returns false if the object is not `mp_timestamp_type`
+```
 
 ## Tests
 Tests integrated into Meson:
