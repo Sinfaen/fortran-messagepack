@@ -9,6 +9,7 @@ program packing
     class(mp_arr_type), allocatable :: arr_test
     class(mp_map_type), allocatable :: map_test
     class(mp_ext_type), allocatable :: ext_test
+    clasS(mp_timestamp_type), allocatable :: ts_test
 
     byte, allocatable, dimension(:) :: buf
     character(:), allocatable :: small_text
@@ -407,5 +408,104 @@ program packing
     deallocate(ext_test)
     deallocate(b_var_temp)
     print *, "[Info: Ext32 packing test succeeded"
+
+    ! timestamp32 test
+    ts_test = mp_timestamp_type(50, 0)
+    call pack_alloc(ts_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack timestamp32"
+        stop 1
+    end if
+    ! expect 6 bytes
+    b_6_temp = (/MP_FE4,-1,0,0,0,50/)
+    if (size(buf) == 6) then
+        do i = 1,6
+            if (buf(i) /= b_6_temp(i)) then
+                print *, "[Error: packed timestamp32 byte[]", i, "] ==", buf(i), "Expected:", b_6_temp(i)
+                stop 1
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack timestamp32. Size:", size(buf), "Expected: 6"
+        stop 1
+    end if
+    deallocate(ts_test)
+    print *, "[Info: timestamp32 packing test succeeded"
+
+    ! timestamp64 test
+    ! 0x000003a0 000088b8
+    ts_test = mp_timestamp_type(35000, 232)
+    call pack_alloc(ts_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack timestamp64"
+        stop 1
+    end if
+    ! expect 10 bytes
+    b_10_temp(1) = MP_FE8
+    b_10_temp(2) = -1_int8
+    b_10_temp(3) = 0
+    b_10_temp(4) = 0
+    b_10_temp(5) = 3
+    b_10_temp(6) = -96 ! 0xa0
+    b_10_temp(7) = 0
+    b_10_temp(8) = 0
+    b_10_temp(9) = -120 ! 0x88
+    b_10_temp(10) = -72 ! 0xb8
+    if (size(buf) == 10) then
+        do i = 1,10
+            if (buf(i) /= b_10_temp(i)) then
+                print *, "[Error: packed timestamp64 byte[]", i, "] ==", buf(i), "Expected:", b_6_temp(i)
+                stop 1
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack timestamp64. Size:", size(buf), "Expected: 8"
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(ts_test)
+    print *, "[Info: timestamp64 packing test succeeded"
+
+    ! timestamp96 test
+    ! 0x000004d2
+    ! 0xfffffffffffff830
+    ts_test = mp_timestamp_type(-2000, 1234)
+    call pack_alloc(ts_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack timestamp96"
+        stop 1
+    end if
+    ! expect 15 bytes
+    allocate(b_var_temp(15))
+    b_var_temp(1) = MP_E8
+    b_var_temp(2) = 12
+    b_var_temp(3) = -1
+    b_var_temp(4) = 0
+    b_var_temp(5) = 0
+    b_var_temp(6) = 4
+    b_var_temp(7) = -46 ! 0xd2
+    b_var_temp(8) = -1
+    b_var_temp(9) = -1
+    b_var_temp(10) = -1
+    b_var_temp(11) = -1
+    b_var_temp(12) = -1
+    b_var_temp(13) = -1
+    b_var_temp(14) = -8 ! 0xf8
+    b_var_temp(15) = 48 ! 0x30
+    if (size(buf) == 15) then
+        do i = 1,15
+            if (buf(i) /= b_var_temp(i)) then
+                print *, "[Error: packed timestamp96 byte[]", i, "] ==", buf(i), "Expected:", b_6_temp(i)
+                stop 1
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack timestamp96. Size:", size(buf), "Expected: 15"
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(b_var_temp)
+    deallocate(ts_test)
+    print *, "[Info: timestamp96 packing test succeeded"
 
 end program

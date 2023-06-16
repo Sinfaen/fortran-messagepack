@@ -3,6 +3,7 @@ program unpacking
     implicit none
 
     ! variables to use
+    class(mp_settings), allocatable :: mp_s
     byte, allocatable, dimension(:) :: stream ! buffer of bytes
     class(mp_value_type), allocatable :: mpv  ! pointer to value
     integer :: i, i_tmp
@@ -16,15 +17,17 @@ program unpacking
     class(mp_arr_type), allocatable :: arrtmp
     class(mp_map_type), allocatable :: maptmp
     class(mp_ext_type), allocatable :: exttmp
+    class(mp_timestamp_type), allocatable :: ts_tmp
     logical :: status
 
     print *, "Unpacking test"
     call print_endianness()
+    mp_s = mp_settings()
 
     ! positive fix int test: VALUE = 45
     allocate(stream(1))
     stream(1) = 45
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream (PFI)"
@@ -45,7 +48,7 @@ program unpacking
     ! negative fix int test: VALUE = -2
     allocate(stream(1))
     stream(1) = -30 ! 0b11100010 as int8
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream (NFI)"
@@ -70,7 +73,7 @@ program unpacking
     stream(3) = -102_int8 ! 0x9a
     stream(4) =  -55_int8 ! 0xc9
     stream(5) =   -1_int8 ! 0xff
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(UInt32)"
@@ -101,7 +104,7 @@ program unpacking
     stream(7) =    0 ! 0x00
     stream(8) =    5 ! 0x05
     stream(9) =   65 ! 0x41
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(UInt64 big)"
@@ -129,7 +132,7 @@ program unpacking
     stream(3) = 101 ! e
     stream(4) = 103 ! g
     stream(5) = 111 ! o
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(fixstr)"
@@ -158,7 +161,7 @@ program unpacking
     stream(4) = MP_I16 ! int 16 byte mark
     stream(5) = 125 ! 0x7d
     stream(6) = 0   ! 0x00
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(fixarr)"
@@ -230,7 +233,7 @@ program unpacking
     stream(27) = ior(MP_FA_L, 2) ! fixarr byte mark
     stream(28) =   4 ! positive fix int
     stream(29) = -30 ! 0b11100010 as int8
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(fixmap)"
@@ -324,7 +327,7 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 2) = int(i, kind=int8)
     end do
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
@@ -355,7 +358,7 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 3) = int(modulo(i, 35), kind=int8)
     end do
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
@@ -388,7 +391,7 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 5) = int(modulo(i, 25) * modulo(i, 14), kind=int8)
     end do
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
@@ -417,7 +420,7 @@ program unpacking
     stream(2) = 4 ! type
     stream(3) = 2 ! data
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -456,7 +459,7 @@ program unpacking
     stream(3) = -1 ! data
     stream(4) = -2
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -497,7 +500,7 @@ program unpacking
     stream(5) = 100
     stream(6) = -20
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -533,7 +536,7 @@ program unpacking
         stream(2+i) = int(i, kind=int8)
     end do
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -569,7 +572,7 @@ program unpacking
         stream(2+i) = int(-i, kind=int8)
     end do
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -606,7 +609,7 @@ program unpacking
     stream(5) = 2
     stream(6) = 3
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -648,7 +651,7 @@ program unpacking
         stream(4 + i) = int(401 - i, kind=int8)
     end do
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -694,7 +697,7 @@ program unpacking
         stream(6 + i) = int(modulo(i, 3_int8), kind=int8)
     end do
 
-    call unpack_stream(stream, mpv, status)
+    call unpack_stream(mp_s, stream, mpv, status)
     deallocate(stream)
     if (.not.(status)) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
@@ -725,5 +728,118 @@ program unpacking
 
     deallocate(mpv)
     print *, "[Info: ext32 test succeeded"
+
+    ! extension testing
+    ! timestamp32 test
+    ! 300 seconds => 0x0000012c
+    allocate(stream(6))
+    stream(1) = MP_FE4
+    stream(2) = -1_int8
+    stream(3) = 0  ! 0x00
+    stream(4) = 0  ! 0x00
+    stream(5) = 1  ! 0x01
+    stream(6) = 44 ! 0x2c
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp32)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= 300 .or. ts_tmp%nanoseconds /= 0) then
+        print *, "[Error: unpacked timestamp32: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected 300s"
+        stop 1
+    end if
+
+    deallocate(mpv)
+    print *, "[Info: timestamp32 test succeeded"
+
+    ! timestamp64 test
+    ! 2^30 seconds, 2^5 ns
+    ! 0x00000080 40000000  this is hard to calculate
+    allocate(stream(10))
+    stream(1) = MP_FE8
+    stream(2) = -1_int8
+    stream(3) = 0 ! 0x00
+    stream(4) = 0 ! 0x00
+    stream(5) = 0 ! 0x00
+    stream(6) = -128 ! 0x80
+    stream(7) = 64 ! 0x40
+    stream(8) = 0 ! 0x00
+    stream(9) = 0 ! 0x00
+    stream(10) = 0 ! 0x00
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp64)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= 1073741824_int64 .or. &
+            ts_tmp%nanoseconds /= 32) then
+        print *, "[Error: unpacked timestamp64: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected 1073741824 seconds, 32 ns"
+        stop 1
+    end if
+
+    print *, "[Info: timestamp64 test succeeded"
+
+    ! timestamp96 test
+    ! -200 seconds, 30 ns
+    ! 0x0000001e
+    ! 0xffffffffffffff38
+    allocate(stream(15))
+    stream(1)  = MP_E8
+    stream(2)  = 12
+    stream(3)  = -1
+    stream(4)  = 0  ! 0x00
+    stream(5)  = 0  ! 0x00
+    stream(6)  = 0  ! 0x00
+    stream(7)  = 30 ! 0x1e
+    stream(8)  = -1 ! 0xff
+    stream(9)  = -1 ! 0xff
+    stream(10) = -1 ! 0xff
+    stream(11) = -1 ! 0xff
+    stream(12) = -1 ! 0xff
+    stream(13) = -1 ! 0xff
+    stream(14) = -1 ! 0xff
+    stream(15) = 56 ! 0x38
+
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking (timestamp96)"
+        stop 1
+    end if
+    ! check that timestamp was unpacked
+    if (.not. is_timestamp(mpv)) then
+        print *, "[Error: Did not unpack timestamp"
+        stop 1
+    end if
+    ! check type and data
+    call get_timestamp_ref(mpv, ts_tmp, status)
+    if (ts_tmp%seconds /= -200 .or. &
+            ts_tmp%nanoseconds /= 30) then
+        print *, "[Error: unpacked timestamp64: ", ts_tmp%seconds, ts_tmp%nanoseconds
+        print *, "    while expected -200 seconds, 30 ns"
+        stop 1
+    end if
+
+    print *, "[Info: timestamp96 test succeeded"
 
 end program
