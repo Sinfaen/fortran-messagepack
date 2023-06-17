@@ -170,29 +170,121 @@ program unpacking
     ! check length of the array
     i_a_3 = (/12, -3, 32000/)
     if (mpv%numelements() /= 3) then
-        print *, "[Error: unpacked fixarray contains ", mpv%numelements(), " elements instead of 3"
+        print *, "[Error: unpacked fixarray contains ", mpv%numelements(), &
+            " elements instead of 3"
         stop 1
     end if
-    select type (mpv)
-    type is (mp_value_type)
-    class is (mp_arr_type)
-        ! loop over all elements
-        do i = 1,3
-            if (.not. is_int(mpv%value(i)%obj)) then
-                print *, "[Error: fixarray[", i, "] is not an int"
-                stop 1
-            end if
-            call get_int(mpv%value(i)%obj, itmp, status)
-            if (itmp /= i_a_3(i)) then
-                print *, "[Error: unpacked ", itmp, "instead of", i_a_3(i), "for fixarray > ", i
-            end if
-        end do
-    class default
+    call get_arr_ref(mpv, arrtmp, status)
+    if (.not.(status)) then
         print *, "[Error: did not unpack mp_arr_type"
         stop 1
-    end select
+    end if
+
+    ! loop over all elements
+    do i = 1,3
+        if (.not. is_int(arrtmp%value(i)%obj)) then
+            print *, "[Error: fixarray[", i, "] is not an int"
+            stop 1
+        end if
+        call get_int(arrtmp%value(i)%obj, itmp, status)
+        if (itmp /= i_a_3(i)) then
+            print *, "[Error: unpacked ", itmp, "instead of", i_a_3(i), "for fixarray > ", i
+        end if
+    end do
     deallocate(mpv)
     print *, "[Info: Fixarray test succeeded"
+
+    ! array16 test: 17 elements
+    ! 8 bool all false, 8 bool all true
+    ! 1 nil
+    ! 3 + 17
+    allocate(stream(20))
+    stream(1) = MP_A16
+    stream(2) = 0
+    stream(3) = 17
+    do i = 1,8
+        stream(3 + i)  = MP_F
+        stream(11 + i) = MP_T
+    end do
+    stream(20) = MP_NIL
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: unpacking stream(array16)"
+        stop 1
+    end if
+    ! check length
+    call get_arr_ref(mpv, arrtmp, status)
+    if (.not. status) then
+        print *, "[Error: failed to unpack array16"
+        stop 1
+    end if
+    if (arrtmp%numelements() /= 17) then
+        print *, "[Error: unpacked array16 contains ", arrtmp%numelements(), &
+            " elements instead of 20"
+        stop 1
+    end if
+    ! check elements
+    do i = 1,16
+        call get_bool(arrtmp%value(i)%obj, btmp, status)
+        if (.not.(status)) then
+            print *, "[Error: array16", i, "is not a boolean"
+            stop 1
+        end if
+        if (btmp .neqv. (i > 8)) then
+            print *, "[Error: array16", i, "is not the expected value", i > 8
+            stop 1
+        end if
+    end do
+    if (.not.(is_nil(arrtmp%value(17)%obj))) then
+        print *, "[Error: array16(17) is not nil"
+        stop 1
+    end if
+    deallocate(mpv)
+    print *, "[Info: array16 test succeeded"
+
+    ! array32 test: 2^20 elements
+    ! all bin8 values of one byte each, modulo(i, 27)
+    ! 5 + 1048576 * 3
+    allocate(stream(3145733))
+    stream(1) = MP_A32
+    stream(2:5) = int((/0,16,0,0/), kind=int8)
+    do i = 1,1048576
+        stream(6+3*(i-1)) = MP_B8
+        stream(7+3*(i-1)) = 1
+        stream(8+3*(i-1)) = int(modulo(i, 27), kind=int8)
+    end do
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: unpacking stream(array32)"
+        stop 1
+    end if
+    ! check length
+    call get_arr_ref(mpv, arrtmp, status)
+    if (.not. status) then
+        print *, "[Error: failed to unpack array32"
+        stop 1
+    end if
+    if (arrtmp%numelements() /= 1048576) then
+        print *, "[Error: unpacked array32 contains ", arrtmp%numelements(), &
+            " elements instead of 20"
+        stop 1
+    end if
+    ! check elements
+    do i = 1,1048576
+        call get_bin(arrtmp%value(i)%obj, byte_tmp, status)
+        if (.not.(status)) then
+            print *, "[Error: unpacked array32", i, "is not a bin"
+            stop 1
+        end if
+        if (size(byte_tmp) /= 1 .or. byte_tmp(1) /= modulo(i, 27)) then
+            print *, "[Error: unpacked array32", i, "is invalid"
+            stop 1
+        end if
+    end do
+    deallocate(mpv)
+    print *, "[Info: array32 test succeeded"
 
     ! fixmap test: 3 elements
     ! also serves as a double container test & float32 test
@@ -317,6 +409,126 @@ program unpacking
     end do
     deallocate(mpv)
     print *, "[Info: Fixmap test succeeded"
+
+    ! map16 test: 2^13 elements
+    ! keys: NFI -1:-10
+    ! values: fixext1: 2, 1:10
+    ! 3 + 8192 * 1 + 8192 * 3
+    allocate(stream(32771))
+    stream(1) = MP_M16
+    stream(2) = 32
+    stream(3) = 0
+    do i = 1,8192
+        ! key
+        stream(4+4*(i-1)) = int(-32 + modulo(i, 11), kind=int8)
+        ! value
+        stream(5+4*(i-1)) = MP_FE1
+        stream(6+4*(i-1)) = 2
+        stream(7+4*(i-1)) = int(modulo(i, 11), kind=int8)
+    end do
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(map16)"
+        stop 1
+    end if
+    if (mpv%numelements() /= 8192) then
+        print *, "[Error: unpacked map16 contains ", mpv%numelements(), &
+            " elements instead of 8192"
+        stop 1
+    end if
+    ! check elements
+    call get_map_ref(mpv, maptmp, status)
+    if (.not.(status)) then
+        print *, "[Error: did not unpack mp_map_type"
+        stop 1
+    end if
+    do i = 1,8192
+        ! check key
+        call get_int(maptmp%keys(i)%obj, itmp, status)
+        if (.not.(status)) then
+            print *, "[Error: map16 key", i, "is not an int"
+            stop 1
+        end if
+        if (itmp /= -(modulo(i, 11))) then
+            print *, "[Error: map16 key", i, "is not", -(modulo(i, 11))
+            stop 1
+        end if
+        ! check value
+        call get_ext_ref(maptmp%values(i)%obj, exttmp, status)
+        if (.not.(status)) then
+            print *, "[Error: map16 value", i, "is not an ext"
+            stop 1
+        end if
+        if (exttmp%numelements() /= 1 .or. &
+                exttmp%values(1) /= modulo(i, 11)) then
+            print *, "[Error: map16 value", i, "has value", exttmp%values(1), &
+                "instead of", modulo(i, 11)
+            stop 1
+        end if
+    end do
+    deallocate(mpv)
+    print *, "[Info: map16 test succeeded"
+
+    ! map32 test: 2^18 elements
+    ! keys: PFI 22:37
+    ! values: fixext2 3, 1..5, 1..13
+    ! 5 + 262144*1 + 262144*4
+    allocate(stream(1310725))
+    stream(1) = MP_M32
+    stream(2:5) = int((/0,4,0,0/), kind=int8)
+    do i = 1,262144
+        ! key
+        stream(6+5*(i-1)) = int(21 + modulo(i, 16), kind=int8)
+        ! value
+        stream(7 +5*(i-1)) = MP_FE2
+        stream(8 +5*(i-1)) = 3
+        stream(9 +5*(i-1)) = int(modulo(i, 6), kind=int8)
+        stream(10+5*(i-1)) = int(modulo(i, 14), kind=int8)
+    end do
+    call unpack_stream(mp_s, stream, mpv, status)
+    deallocate(stream)
+    if (.not.(status)) then
+        print *, "[Error: issue occurred with unpacking stream(map32)"
+        stop 1
+    end if
+    if (mpv%numelements() /= 262144) then
+        print *, "[Error: unpacked map32 contains ", mpv%numelements(), &
+            " elements instead of 262144"
+        stop 1
+    end if
+    ! check elements
+    call get_map_ref(mpv, maptmp, status)
+    if (.not.(status)) then
+        print *, "[Error: did not unpack mp_map_type"
+        stop 1
+    end if
+    do i = 1,262144
+        ! check key
+        call get_int(maptmp%keys(i)%obj, itmp, status)
+        if (.not.(status)) then
+            print *, "[Error: map32 key", i, "is not an int"
+            stop 1
+        end if
+        if (itmp /= 21 + modulo(i, 16)) then
+            print *, "[Error: map32 key", i, "is not", 21 + modulo(i, 16)
+            stop 1
+        end if
+        ! check value
+        call get_ext_ref(maptmp%values(i)%obj, exttmp, status)
+        if (.not.(status)) then
+            print *, "[Error: map32 value", i, "is not an ext"
+            stop 1
+        end if
+        if (exttmp%numelements() /= 2 .or. &
+                exttmp%values(1) /= modulo(i, 6) .or. &
+                exttmp%values(2) /= modulo(i, 14)) then
+            print *, "[Error: map32 value", i, "has invalid data"
+            stop 1
+        end if
+    end do
+    deallocate(mpv)
+    print *, "[Info: map32 test succeeded"
 
     ! bin8 test
     ! values = x
