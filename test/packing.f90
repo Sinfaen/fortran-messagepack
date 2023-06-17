@@ -4,18 +4,25 @@ program packing
     implicit none
 
     ! variables to use
+    class(mp_value_type), allocatable :: mp_val
     class(mp_int_type), allocatable :: int_test
+    class(mp_float_type), allocatable :: real_test
     class(mp_str_type), allocatable :: str_test
     class(mp_arr_type), allocatable :: arr_test
     class(mp_map_type), allocatable :: map_test
     class(mp_ext_type), allocatable :: ext_test
     clasS(mp_timestamp_type), allocatable :: ts_test
 
+    class(mp_settings), allocatable :: mp_s
+
     byte, allocatable, dimension(:) :: buf
     character(:), allocatable :: small_text
     integer :: i
+    integer :: j
     integer :: length
     logical :: errored
+    logical :: success
+    real(kind=real64) :: rval
 
     byte, dimension(3) :: b_3_temp
     byte, dimension(4) :: b_4_temp
@@ -27,6 +34,7 @@ program packing
     int_test = mp_int_type(4)
 
     print *, "Packing test"
+    mp_s = mp_settings()
 
     ! positive fix int test
     call pack_alloc(int_test, buf, errored)
@@ -100,7 +108,8 @@ program packing
     do i = 1,length
         if (buf(2+i) /= transfer(small_text(i:i), 1_int8)) then
             print *, "[Error: Str8 buffer did not match at index: ", 2+i
-            print *, "[Info: ", transfer(small_text(i:i), 0_int8), "!=", buf(2+i)
+            print *, "[Info: ", transfer(small_text(i:i), 0_int8), "!=", &
+                buf(2+i)
             stop 1
         end if
     end do
@@ -123,7 +132,8 @@ program packing
     ! expect 22 bytes
     if (size(buf) == 22) then
         if (buf(1) /= ior(MP_FA_L, 4)) then
-            print *, "[Error: failed to pack fixarray. byte(1): ", buf(1), "expected: ", ior(MP_FA_L, 4)
+            print *, "[Error: failed to pack fixarray. byte(1): ", &
+                buf(1), "expected: ", ior(MP_FA_L, 4)
             stop 1
         end if
     else
@@ -133,6 +143,92 @@ program packing
     deallocate(buf)
     deallocate(arr_test)
     print *, "[Info: Fixarray packing test succeeded"
+
+    ! array16 test
+    ! 2^14 elements: all PFI values within [3,123]
+    ! - use PFI so that the binary checking is easy
+    arr_test = mp_arr_type(16384_int64)
+    do i = 1,16384
+        arr_test%value(i)%obj = mp_int_type(modulo(i, 120) + 3)
+    end do
+    call pack_alloc(arr_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack array16"
+        stop 1
+    end if
+    ! expect 16387 bytes
+    if (size(buf) == 16387) then
+        if (buf(1) /= MP_A16) then
+            print *, "[Error: failed to pack array16. byte(1): ", &
+                buf(1), "expected: ", ior(MP_FA_L, 4)
+            stop 1
+        end if
+        if (buf(2) /= 64 .or. buf(3) /= 0) then
+            print *, "[Error: failed to pack array16 size data"
+            stop 1
+        end if
+        do i = 1,16384
+            if (buf(3+i) /= modulo(i, 120) + 3) then
+                print *, "[Error: array16 byte(", i, ")=", buf(2+i), &
+                    ". Expected", modulo(i, 120) + 3
+                stop 1
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack array16 correctly. Size: ", size(buf)
+        stop 1
+    end if
+    deallocate(arr_test)
+    deallocate(buf)
+    print *, "[Info: array16 packing test succeeded"
+
+    ! array32 test
+    ! 2^20 elements = 1048576
+    ! all uint8 elements [200:255]. allows easy binary checking
+    arr_test = mp_arr_type(1048576_int64)
+    do i = 1,1048576
+        arr_test%value(i)%obj = mp_int_type(199 + modulo(i, 57))
+    end do
+    call pack_alloc(arr_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack array32"
+        stop 1
+    end if
+    ! expect 2^20 * 2 +_ 5 bytes
+    if (size(buf) == 2097157) then
+        if (buf(1) /= MP_A32) then
+            print *, "[Error: failed to pack array32. byte(1): ", &
+                buf(1), "expected: ", ior(MP_FA_L, 4)
+            stop 1
+        end if
+        if (buf(2) /= 0 .or. buf(3) /= 16 .or. &
+            buf(4) /= 0 .or. buf(5) /= 0) then
+            print *, "[Error: failed to pack array32 size data"
+            stop 1
+        end if
+        do i = 1,1048576_int64
+            ! first byte is uint8
+            if (buf(5 + 2*i - 1) /= MP_U8) then
+                print *, "[Error: array32 ind marker(", i, ")=", &
+                    buf(5+2*i-1), &
+                    ". Expected", MP_U8
+                stop 1
+            end if
+            ! 200 => -56, 255 => -1
+            if (buf(5 + 2*i) /= -57 + modulo(i, 57)) then
+                print *, "[Error: array32 ind(", i, ")=", buf(5+2*i), &
+                    ". Expected", -57 + modulo(i, 57)
+                stop 1
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack array32 correctly. Size: ", size(buf)
+        stop 1
+    end if
+
+    deallocate(arr_test)
+    deallocate(buf)
+    print *, "[Info: array32 packing test succeeded"
 
     ! fixmap test
     arr_test = mp_arr_type(1_int64)
@@ -153,7 +249,8 @@ program packing
     ! expect 21 bytes
     if (size(buf) == 21) then
         if (buf(1) /= ior(MP_FM_L, 3)) then
-            print *, "[Error: failed to pack fixmap. byte(1): ", buf(1), "expected: ", ior(MP_FM_L, 3)
+            print *, "[Error: failed to pack fixmap. byte(1): ", &
+                buf(1), "expected: ", ior(MP_FM_L, 3)
             stop 1
         end if
     else
@@ -163,6 +260,125 @@ program packing
     deallocate(buf)
     deallocate(map_test)
     print *, "[Info: Fixmap packing test succeeded"
+
+    ! map16 test
+    ! keys = NFI -1:-16
+    ! values = [.false., .true., ...]
+    map_test = mp_map_type(16_int64)
+    do i = 1,16
+        map_test%keys(i)%obj = mp_int_type(-i)
+        map_test%values(i)%obj = mp_bool_type(modulo(i, 2) == 0)
+    end do
+    call pack_alloc(map_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack map16"
+        stop 1
+    end if
+    ! expect 3 + 16 + 16 bytes
+    ! headers go from -31 => -1 as signed integers
+    if (size(buf) == 35) then
+        if (buf(1) /= MP_M16) then
+            print *, "[Error: failed to pack map16. byte(1): ", &
+                buf(1), "expected: ", MP_M16
+            stop 1
+        end if
+        if (buf(2) /= 0 .or. buf(3) /= 16) then
+            print *, "[Error: failed to pack map16 size"
+            stop 1
+        end if
+        do i = 1,16
+            if (buf(3 + 2*i - 1) /= -32 + i) then
+                print *, "[Error: failed to pack map16 key at index", i
+                print *, "Found", buf(3+2*i-1), "Expected", -32 + i
+                stop 1
+            end if
+            if (modulo(i, 2) == 1) then ! false
+                if (buf(3 + 2*i) /= MP_F) then
+                    print *, "[Error: failed to pack false value, index", i
+                    stop 1
+                end if
+            else
+                if (buf(3 + 2*i) /= MP_T) then
+                    print *, "[Error: failed to pack true value, index", i
+                    stop 1
+                end if
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack map16 correctly. Size: ", size(buf)
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(map_test)
+    print *, "[Info: map16 packing test succeeded"
+
+    ! map32 test, 2^16
+    ! keys   = real32 ( 1.0: 65536.0)
+    ! values = real32 ( log(1:65536) )
+    map_test = mp_map_type(65536_int64)
+    do i = 1,65536
+        map_test%keys(i)%obj   = new_real32(i + 0.0)
+        map_test%values(i)%obj = new_real32(log(i + 0.0))
+    end do
+    call pack_alloc(map_test, buf, errored)
+    if (errored) then
+        print *, "[Error: failed to pack map32"
+        stop 1
+    end if
+    ! expect 5 + 65536 * 5 * 2 bytes
+    b_4_temp = (/0,1,0,0/) ! used for checking size bytes
+    if (size(buf) == 655365) then
+        if (buf(1) /= MP_M32) then
+            print *, "[Error: failed to pack map32. byte(1): ", &
+                buf(1), "expected: ", MP_M32
+            stop 1
+        end if
+        do i = 1,4
+            if (buf(1+i) /= b_4_temp(i)) then
+                print *, "[Error: failed to pack map32 size"
+                stop 1
+            end if
+        end do
+        ! unpack the floating point keys & values
+        do i = 1,65536
+            j = 5 + (10*i) - 9 ! start index
+            ! key checking
+            call unpack_stream(mp_s, buf(j:j + 4), &
+                mp_val, success)
+            if (.not. success) then
+                print *, "[Error: failed to unpack map32 key at", i
+                stop 1
+            end if
+            call get_real(mp_val, rval, success)
+            if (.not. success) then
+                print *, "[Error: failed to unpack real map32 key at", i
+                stop 1
+            end if
+            if (rval /= i + 0.0) then
+                print *, "[Error: map32 key was", rval, "and not ", i
+            end if
+            deallocate(mp_val)
+            ! value checking
+            call unpack_stream(mp_s, buf(j+5:j+9), &
+                mp_val, success)
+            if (.not. success) then
+                print *, "[Error: failed to unpack map32 value at", i
+            end if
+            call get_real(mp_val, rval, success)
+            if (.not. success) then
+                print *, "[Error: failed to unpack real map32 value at", i
+            end if
+            if (rval /= log(i + 0.0)) then
+                print *, "[Error: map32 value was", rval, "and not", i
+            end if
+        end do
+    else
+        print *, "[Error: failed to pack map32 correctly. Size: ", size(buf)
+        stop 1
+    end if
+    deallocate(buf)
+    deallocate(map_test)
+    print *, "[Info: map32 packing test succeeded"
 
     ! fixext1 test
     ext_test = mp_ext_type(5, 1_int64)
