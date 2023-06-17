@@ -124,7 +124,7 @@ module messagepack_unpack
                 byteadvance = 1 + btemp1
             case (MP_NIL)
                 ! default is already nil
-                return
+                mpv = mp_nil_type()
             case (MP_NU)
                 print *, "Error, never used detected"
                 successful = .false.
