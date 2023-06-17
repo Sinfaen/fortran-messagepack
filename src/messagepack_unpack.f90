@@ -146,11 +146,12 @@ module messagepack_unpack
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(3:)
+                    mpv%value(:) = buffer(3:2+val_int64)
                 class default
                     successful = .false.
                     print *, "[Error: something went terribly wrong"
                 end select
+                byteadvance = 2 + val_int64
             case (MP_B16)
                 ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), is_little_endian)
@@ -164,11 +165,12 @@ module messagepack_unpack
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(4:)
+                    mpv%value(:) = buffer(4:3+val_int64)
                 class default
                     successful = .false.
                     print *, "[Error: something went terribly wrong"
                 end select
+                byteadvance = 3 + val_int64
             case (MP_B32)
                 ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), is_little_endian)
@@ -182,11 +184,12 @@ module messagepack_unpack
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(6:)
+                    mpv%value(:) = buffer(6:5+val_int64)
                 class default
                     successful = .false.
                     print *, "[Error: something went terribly wrong"
                 end select
+                byteadvance = 5 + val_int64
             case (MP_E8)
                 ! check for first 3 bytes
                 if (.not. check_length_and_print(3_int64, length)) then
