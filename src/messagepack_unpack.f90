@@ -626,7 +626,7 @@ module messagepack_unpack
             type is (mp_value_type)
             class is (mp_ext_type)
                 mpv%values = buffer(byteadvance:byteadvance+length-1)
-                byteadvance = byteadvance + length
+                byteadvance = byteadvance + length - 1
             class default
                 successful = .false.
                 deallocate(mpv)
