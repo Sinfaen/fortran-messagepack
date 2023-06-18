@@ -138,7 +138,7 @@ module messagepack_user
 
             integer :: arr_index
 
-            arr_index = typeid + 128 ! [-128, 127] -> [1, 256]
+            arr_index = typeid + 129 ! [-128, 127] -> [1, 256]
 
             select case(ext)
             case (MP_FE1)

@@ -568,7 +568,11 @@ module messagepack_unpack
             end if
 
             ! Custom extension handling
-            ind = etype + 128
+            ind = etype + 129
+            if (ind < 1 .or. ind > 256) then
+                successful = .false.
+                return
+            end if
             if (length == 1) then
                 if (settings%f1_allocated(ind)) then
                     call settings%f1(ind)%cb(buffer, byteadvance, &
