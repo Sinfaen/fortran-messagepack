@@ -1,14 +1,18 @@
 # fortran-messagepack
-Prototype library for messagepack support in fortran. A shared library with the basename `messagepack` is compiled. 
+Library for [MessagePack](https://msgpack.org/) support in fortran.
 
-Utilizes OOP.
+## Supported Build Systems
+| Build System | Targets | Known Working Versions |
+| --- | --- | --- |
+| Meson | messagepack | 0.61.2 |
+| CMake | messagepack | 3.22.1 |
+| FPM | . | 0.9.0, alpha |
 
 ## Requirements
 - Fortran 2008
-- `meson` build system (only one supported for now)
+   - OOP utilized heavily
 
 ## Examples
-
 ### Unpacking
 ```fortran
 program test
