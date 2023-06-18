@@ -1,5 +1,5 @@
 
-project('fortran-messagepack', ['fortran'],
+project('fortran_messagepack', ['fortran'],
     version : '0.1.2')
 
 my_lib = shared_library('messagepack',
@@ -24,3 +24,8 @@ e3 = executable('packing',
     'test/packing.f90',
     dependencies : [my_dep])
 test('packing', e3)
+
+# demo executables
+simple_demo = executable('simple-demo',
+    'app/simple-demo/main.f90',
+    dependencies : [my_dep])

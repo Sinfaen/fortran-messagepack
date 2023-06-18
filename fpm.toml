@@ -1,0 +1,27 @@
+name = "fortran_messagepack"
+version = "0.1.2"
+license="MIT"
+author="Kelly Schultz"
+maintainer="ksjaculus@gmail.com"
+copyright="Copyright 2023, Kelly Schultz"
+description="Implements an API for serializing & deserializing MessagePack"
+
+[[executable]]
+name = "simple-demo"
+source-dir = "app/simple-demo"
+main = "main.f90"
+
+[[test]]
+name = "constructors"
+source-dir = "test"
+main = "constructors.f90"
+
+[[test]]
+name = "packing"
+source-dir = "test"
+main = "packing.f90"
+
+[[test]]
+name = "unpacking"
+source-dir = "test"
+main = "unpacking.f90"
