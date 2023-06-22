@@ -15,7 +15,7 @@ module messagepack
     implicit none
 contains
     subroutine print_version()
-        print *, "0.0.1"
+        print *, "0.1.3"
     end subroutine
 
     subroutine print_messagepack(obj)
@@ -90,6 +90,22 @@ contains
         if (.not. sameline) then
             print *, ""
         end if
+    end subroutine
+
+    subroutine print_bytes_as_hex(bytes)
+        ! prints a buffer of bytes as the unsigned hex version
+        ! @param[in] bytes - byte buffer to print
+        ! @returns none
+        byte, dimension(:), allocatable, intent(in) :: bytes
+
+        integer :: i
+        integer :: val
+        write(*, "(A2)", advance="no") "[ "
+        do i = 1,size(bytes)
+            val = int8_as_unsigned(bytes(i))
+            write(*, '(Z2.2, " ")', advance="no") val
+        end do
+        write(*,*) "]"
     end subroutine
 
 end module

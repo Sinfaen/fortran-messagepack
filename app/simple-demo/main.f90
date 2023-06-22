@@ -38,7 +38,7 @@ program simple_demo
     end if
     ! print the buffer
     print *, "Serialized Data:"
-    print *, buffer
+    call print_bytes_as_hex(buffer)
 
     deallocate(buffer)
 end program
