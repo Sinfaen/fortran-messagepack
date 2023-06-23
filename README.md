@@ -8,6 +8,8 @@ Library for [MessagePack](https://msgpack.org/) support in fortran.
 | CMake | messagepack | 3.22.1 |
 | FPM | . | 0.9.0, alpha |
 
+Known to work with `gfortran` 9.4.0 and above.
+
 ## Requirements
 - Fortran 2008
    - OOP utilized heavily
