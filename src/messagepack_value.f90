@@ -261,6 +261,20 @@ module messagepack_value
             end if
         end function
 
+        integer function get_bin_type(length)
+            ! get type of bin based on length of data
+            integer(kind=int64), intent(in) :: length
+            if (length <= 255) then
+                get_bin_type = MP_B8
+            else if (length <= 65535) then
+                get_bin_type = MP_B16
+            else if (length <= 4294967295_int64) then
+                get_bin_type = MP_B32
+            else
+                get_bin_type = MP_NU ! bad
+            end if
+        end function
+
         integer function get_arr_type(length)
             ! get type of array based on length of the array
             integer(kind=int64), intent(in) :: length
@@ -597,6 +611,7 @@ module messagepack_value
 
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
+            integer :: writeindex
             integer :: bintype
             call this%getsize(length)
             if (length > size(buf)) then
@@ -606,11 +621,21 @@ module messagepack_value
 
             ! serialize values
             length = this%numelements()
-            bintype = get_arr_type(length)
+            bintype = get_bin_type(length)
             buf(1) = int(bintype, kind=int8) ! write marker
 
-            ! copy values in
-            buf(2:1+length) = this%value
+            select case(bintype)
+            case (MP_B8)
+                writeindex = 3
+                buf(2) = int(length, kind=int8)
+            case (MP_B16)
+                writeindex = 4
+                call int_to_bytes_be_2(buf(2:3), int(length, kind=int16))
+            case (MP_B32)
+                writeindex = 6
+                call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            end select
+            buf(writeindex:writeindex+length-1) = this%value
 
             error = .false.
         end subroutine
