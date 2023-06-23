@@ -6,6 +6,8 @@ program simple_demo
 
     ! variables
     class(mp_map_type), allocatable :: mp_map
+    class(mp_arr_type), allocatable :: mp_arr
+    class(mp_bin_type), allocatable :: mp_bin
     logical :: error
     class(mp_settings), allocatable :: mp_s
     byte, dimension(:), allocatable :: buffer
@@ -15,20 +17,31 @@ program simple_demo
 
     mp_s = mp_settings()
 
-    ! map assigning id's to types of rodents
-    mp_map = mp_map_type(4_int64) ! pairs
+    ! complicated example
+    mp_arr = mp_arr_type(3_int64)
+    mp_arr%value(1)%obj = new_real32(5.01)
+    mp_arr%value(2)%obj = new_real32(-21.2)
+    mp_arr%value(3)%obj = new_real32(700.0)
+
+    mp_bin = mp_bin_type(2_int64)
+    mp_bin%value(1) = -2
+    mp_bin%value(2) = 35
+
+    mp_map = mp_map_type(5_int64) ! pairs
     mp_map%keys(1)%obj   = mp_str_type("rat")
     mp_map%values(1)%obj = mp_int_type(5)
     mp_map%keys(2)%obj   = mp_str_type("gerbil")
-    mp_map%values(2)%obj = mp_int_type(2)
+    mp_map%values(2)%obj = mp_bin
     mp_map%keys(3)%obj   = mp_str_type("capybara")
     mp_map%values(3)%obj = mp_int_type(11)
     mp_map%keys(4)%obj   = mp_str_type("jerboa")
     mp_map%values(4)%obj = mp_int_type(2)
+    mp_map%keys(5)%obj   = mp_bool_type(.true.)
+    mp_map%values(5)%obj = mp_arr
 
     ! print the structure to the user
     print *, "MessagePack map object to be serialized"
-    call print_messagepack(mp_map)
+    call mp_s%print_value(mp_map)
 
     ! pack the data
     call pack_alloc(mp_map, buffer, error)
@@ -38,7 +51,10 @@ program simple_demo
     end if
     ! print the buffer
     print *, "Serialized Data:"
-    call print_bytes_as_hex(buffer)
+    call print_bytes_as_hex(buffer, .true.)
 
     deallocate(buffer)
+    deallocate(mp_map)
+    deallocate(mp_arr)
+    deallocate(mp_bin)
 end program
