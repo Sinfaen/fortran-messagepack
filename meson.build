@@ -1,6 +1,6 @@
 
 project('fortran_messagepack', ['fortran'],
-    version : '0.1.3')
+    version : '0.1.4')
 
 my_lib = shared_library('messagepack',
     'src/messagepack.f90',
