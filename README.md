@@ -57,7 +57,11 @@ program test
 
     ! buffer to fill with MsgPack data
     byte, allocatable, dimension(:) :: buffer
+    ! object used to store various settings
+    class(mp_settings), allocatable :: mps
     logical :: error ! error flag
+
+    mps = mp_settings() ! get default settings
 
     ! create an array with two elements:
     ! ["hello world", .false.]
@@ -72,8 +76,12 @@ program test
         ! insert error handling here
         stop 1
     end if
-    print *, buffer ! output to console
+
+    ! print the messagepack object in a pretty way
+    call mp_s%print_value(mp_deserialized)
+
     deallocate(buffer)
+    deallocate(mp_deserialized)
 
 end program
 ```
@@ -94,6 +102,59 @@ The `mp_value_type` contains the following type-bound procedures:
 | getsize | All | Returns number of bytes taken up by the object |
 | pack | All | Internal use only |
 
+### mp_settings
+
+A special class called `mp_settings` is used to store extra information related to the pack/unpack process. For the most part the user does not need to interact with this class, only instantiate an instance and pass it into the appropriate functions where needed.
+
+Hoever, the class does present some useful debugging functions:
+```fortran
+subroutine print_value(this, obj)
+    ! Prints MessagePack object with default options
+    ! @param[in] this - instance
+    ! @param[in] obj - MessagePack object to print
+    ...
+end subroutine
+
+recursive subroutine print_value_with_args(this, obj, indentation, &
+        sameline, maxelems)
+    ! Prints MessagePack object with a variety of configurability
+    ! @param[in] this - instance
+    ! @param[in] obj - MessagePack object to print in a pretty fashion
+    ! @param[in] indentation - number of levels of indentation to print with
+    ! @param[in] sameline - if true, compacts the output
+    ! @param[in] maxelems - if non-negative, limits number of elements printed
+    ! @returns None
+end subroutine
+```
+
+### Additional Items
+The library exposes the following two global subroutines:
+```fortran
+subroutine print_version() ! prints version of messagepack
+
+subroutine print_bytes_as_hex(bytes, addhexmark)
+    ! prints a buffer of bytes as the unsigned hex version
+    ! @param[in] bytes - byte buffer to print
+    ! @param[in] addhexmark - If true, print with 0x prepended
+    ! @returns none
+end subroutine
+```
+
+## Limitations
+TLDR: please run the tests associated with this library on your system to ensure that this library will work correctly.
+
+### Signed Integers
+Fortran does not support unsigned integers. This library assumes that signed integers are represented with twos-bit complement.
+
+The user must be aware that MessagePack can represent integers larger than what signed 64 bit integers can represent. This is the largest size of integer that the library supports due to portability concerns. `fortran-messagepack` does recognize this, please see the documentation in the [Integer](#integer-format-family) format family on how to deal with this.
+
+### String Representation
+MessagePack explicitly does not specify a character encoding.
+
+### Hash Tables
+Fortran does not supply a built in hash table/hash map/red-black tree/etc datatype. The `mp_map_type` is represented simply as two arrays under the hood, and does not perform key uniqueness checks.
+
+## Format Documentation
 ### Nil
 The underlying support class is `mp_nil_type`.
 
@@ -112,6 +173,14 @@ function is_int(obj) result(res)
 subroutine get_int(obj, val, stat)
 ! @param[out] val - integer to store decoded value
 ! @param[out] stat - Returns false if the object is not `mp_int_type`
+```
+
+If an integer is unpacked that is greater than what a signed 64 bit integer can represent, a special flag will be marked which can be checked for with the `is_unsigned` function. The library leaves further processing of the value up to the user.
+
+```fortran
+logical function is_unsigned(obj) ! true if the value is unsigned
+
+subroutine set_unsigned(obj) ! mark that the stored value is unsigned
 ```
 
 ### Float Format Family
@@ -298,4 +367,10 @@ Tests integrated into Meson:
 | packing | Unit testing of packing with checks on the packed buffers |
 | unpacking | Unit test of unpacking with known packed buffers |
 
-Execute `meson test` to run all tests, or `./<executable_name>` for each test in turn.
+| Build System | Command |
+| --- | --- |
+| meson | meson test |
+| cmake | ctest |
+| fpm | fpm test |
+
+The executables can also be executed directly.
