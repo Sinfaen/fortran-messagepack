@@ -53,6 +53,8 @@ module messagepack_user
     contains
         procedure :: register_extension
         procedure :: register_extension_super
+        procedure :: print_value
+        procedure :: print_value_with_args
     end type
     interface mp_settings
         procedure :: new_settings
@@ -168,6 +170,123 @@ module messagepack_user
             end select
 
             error = .false.
+        end subroutine
+
+        subroutine print_value(this, obj)
+            ! Prints MessagePack object with default options
+            ! @param[in] this - instance
+            ! @param[in] obj - MessagePack object to print
+            class(mp_settings) :: this
+            class(mp_value_type), intent(in) :: obj
+            call this%print_value_with_args(obj, 0, .false., -1)
+        end subroutine
+
+        recursive subroutine print_value_with_args(this, obj, indentation, &
+                sameline, maxelems)
+            ! Prints MessagePack object with a variety of configurability
+            ! @param[in] this - instance
+            ! @param[in] obj - MessagePack object to print in a pretty fashion
+            ! @param[in] indentation - number of levels of indentation to print with
+            ! @param[in] sameline - if true, compacts the output
+            ! @param[in] maxelems - if non-negative, limits number of elements printed
+            ! @returns None
+            class(mp_settings), intent(in) :: this
+            class(mp_value_type), intent(in) :: obj
+            integer, intent(in) :: indentation
+            logical, intent(in) :: sameline
+            integer, intent(in) :: maxelems
+            integer(kind=int64) :: i, j, ind
+
+            if (.not. sameline) then
+                do i = 1,indentation
+                    write(*, "(A2)", advance="no") "  "
+                end do
+            end if
+    
+            select type(obj)
+            type is (mp_value_type)
+            class is (mp_nil_type)
+                write(*, "(A)", advance="no") "nil"
+            class is (mp_bool_type)
+                if (obj%value) then
+                    write(*, "(A)", advance="no") "true"
+                else
+                    write(*, "(A)", advance="no") "false"
+                end if
+            class is (mp_int_type)
+                if (obj%unsigned_64) then
+                    write(*, "(I0, A)", advance="no") obj%value, "[OUT-OF-RANGE]"
+                else
+                    write(*, "(I0)", advance="no") obj%value
+                end if
+                
+            class is (mp_float_type)
+                if (obj%is_64) then
+                    write(*, "(F0.0)", advance="no") obj%f64value
+                else
+                    write(*, "(F0.0)", advance="no") obj%f32value
+                end if
+            class is (mp_str_type)
+                write(*, "(A, A, A)", advance="no") char(34), obj%value, char(34)
+            class is (mp_arr_type)
+                write(*, "(A)", advance="no") "["
+                printarr : do j = 1,obj%numelements()
+                    call this%print_value_with_args(obj%value(j)%obj, 0, .true., maxelems)
+                    write(*, "(A)", advance="no") ", "
+                    if (maxelems > 0 .and. j > maxelems) then
+                        write(*, "(A3)") "..."
+                        exit printarr
+                    end if
+                end do printarr
+                write(*, "(A)", advance="no") "]" 
+            class is (mp_map_type)
+                write(*, "(A)") "{"
+                printmap : do j = 1, obj%numelements()
+                    do i = 1,indentation+1
+                        write(*, "(A2)", advance="no") "  "
+                    end do
+                    call this%print_value_with_args(obj%keys(j)%obj, indentation + 1, &
+                        .true., maxelems)
+                    write(*, "(A)", advance="no") " => "
+                    call this%print_value_with_args(obj%values(j)%obj, indentation + 1, &
+                        .true., maxelems)
+                    print *, ","
+                    if (maxelems > 0 .and. i > maxelems) then
+                        write(*, "(A3)") "..."
+                        exit printmap
+                    end if
+                end do printmap
+                if (.not. sameline) then
+                    do i = 1,indentation
+                        write(*, "(A2)", advance="no") "  "
+                    end do
+                end if
+                write(*, "(A)") "},"
+            class is (mp_bin_type)
+                write(*, "(A)", advance="no") "BIN["
+                printbin : do j = 1,obj%numelements()
+                    write(*, "(I0, A)", advance="no") obj%value(j), ", "
+                    if (maxelems > 0 .and. j > maxelems) then
+                        write(*, "(A)") "..."
+                        exit printbin
+                    end if
+                end do printbin
+                write(*, "(A)", advance="no") "]"
+            class is (mp_ext_type)
+                ind = obj%exttype + 129 ! TODO
+                write(*, "(A)", advance="no") "EXT["
+                printext : do j = 1,obj%numelements()
+                    write(*, "(I0, A)", advance="no") obj%values(j), ", "
+                    if (maxelems > 0 .and. j > maxelems) then
+                        write(*, "(A)") "..."
+                        exit printext
+                    end if
+                end do printext
+                write(*, "(A)", advance="no") "]"
+            end select
+            if (.not. sameline) then
+                print *, ""
+            end if
         end subroutine
 
         subroutine get_size_timestamp(this, osize)
