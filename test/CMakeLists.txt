@@ -18,3 +18,10 @@ add_executable(unpacking
 target_include_directories(unpacking PUBLIC
     ${CMAKE_BINARY_DIR}/modules)
 target_link_libraries(unpacking messagepack)
+
+# roundtrip test
+add_executable(roundtrip
+    roundtrip.f90)
+target_include_directories(roundtrip PUBLIC
+    ${CMAKE_BINARY_DIR}/modules)
+target_link_libraries(roundtrip messagepack)

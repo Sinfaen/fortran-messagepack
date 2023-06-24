@@ -25,3 +25,8 @@ main = "packing.f90"
 name = "unpacking"
 source-dir = "test"
 main = "unpacking.f90"
+
+[[test]]
+name = "roundtrip"
+source-dir = "test"
+main = "roundtrip.f90"

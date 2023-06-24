@@ -24,6 +24,10 @@ e3 = executable('packing',
     'test/packing.f90',
     dependencies : [my_dep])
 test('packing', e3)
+e4 = executable('roundtrip',
+    'test/roundtrip.f90',
+    dependencies : [my_dep])
+test('roundtrip', e4)
 
 # demo executables
 simple_demo = executable('simple-demo',

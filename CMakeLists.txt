@@ -16,3 +16,5 @@ add_test(NAME packing
     COMMAND ./test/packing)
 add_test(NAME unpacking
     COMMAND ./test/unpacking)
+add_test(NAME roundtrip
+    COMMAND ./test/roundtrip)
