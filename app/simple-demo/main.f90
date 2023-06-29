@@ -8,7 +8,6 @@ program simple_demo
     class(mp_map_type), allocatable :: mp_map
     class(mp_arr_type), allocatable :: mp_arr
     class(mp_bin_type), allocatable :: mp_bin
-    logical :: error
     class(msgpack), allocatable :: mp
     byte, dimension(:), allocatable :: buffer
 
@@ -16,6 +15,8 @@ program simple_demo
     print *, 'Simple MessagePack Demo'
 
     mp = msgpack()
+    ! treat extra bytes as an error during unpacking
+    call mp%extra_bytes_is_error(.true.)
 
     ! complicated example
     mp_arr = mp_arr_type(3_int64)

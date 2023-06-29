@@ -52,6 +52,7 @@ module messagepack_user
 
         logical :: is_little_endian
         logical :: fail_flag
+        logical :: extra_bytes
     contains
         procedure :: register_extension
         procedure :: register_extension_super
@@ -66,6 +67,7 @@ module messagepack_user
         procedure :: unpack_map
         procedure :: unpack_ext
         procedure :: unpack_array
+        procedure :: extra_bytes_is_error
     end type
     interface msgpack
         procedure :: new_mp
@@ -111,6 +113,7 @@ module messagepack_user
             ! AFAIK there is no stdlib equivalent of C++20 std::endian
             new_mp%is_little_endian = detect_little_endian()
             new_mp%fail_flag = .false.
+            new_mp%extra_bytes = .true.
 
             ! add timestamp here
             p => unpack_timestamp_32
@@ -120,6 +123,13 @@ module messagepack_user
             p => unpack_timestamp_96
             call new_mp%register_extension_super(MP_E8, -1_int8, p, err)
         end function
+
+        subroutine extra_bytes_is_error(this, val)
+            ! manipulate this flag
+            class(msgpack) :: this
+            logical, intent(in) :: val
+            this%extra_bytes = val
+        end subroutine
 
         subroutine print_version(this)
             class(msgpack) :: this
@@ -254,7 +264,9 @@ module messagepack_user
             call this%unpack_value(buffer, byteadvance, mpv, successful)
             this%fail_flag = .not.(successful)
 
-            if (byteadvance < size(buffer)) then
+            if (byteadvance < size(buffer) .and. this%extra_bytes) then
+                ! configurable error
+                this%fail_flag = .true.
                 print *, "[Warning: Extra", size(buffer) - byteadvance, "bytes unused"
             else if (byteadvance > size(buffer)) then
                 this%fail_flag = .true. ! bug within reporting byte mechanism
