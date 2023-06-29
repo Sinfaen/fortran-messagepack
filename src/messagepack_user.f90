@@ -50,6 +50,8 @@ module messagepack_user
         logical, dimension(256) :: e8_allocated
         logical, dimension(256) :: e16_allocated
         logical, dimension(256) :: e32_allocated
+
+        logical :: is_little_endian
     contains
         procedure :: register_extension
         procedure :: register_extension_super
@@ -96,6 +98,9 @@ module messagepack_user
                 new_settings%e16_allocated = .false.
                 new_settings%e32_allocated = .false.
             end do
+
+            ! AFAIK there is no stdlib equivalent of C++20 std::endian
+            new_settings%is_little_endian = detect_little_endian()
 
             ! add timestamp here
             p => unpack_timestamp_32
