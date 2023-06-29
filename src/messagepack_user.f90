@@ -355,14 +355,14 @@ module messagepack_user
 
             integer(kind=int32) :: temp
 
-            if (size(buffer(byteadvance:)) < 4) then
+            if (size(buffer(byteadvance+1:)) < 4) then
                 successful = .false.
                 return
             end if
 
-            temp = bytes_be_to_int_4(buffer(byteadvance:byteadvance+3), is_little_endian)
+            temp = bytes_be_to_int_4(buffer(byteadvance+1:byteadvance+4), is_little_endian)
             mpv = mp_timestamp_type(temp, 0)
-            byteadvance = byteadvance + 3
+            byteadvance = byteadvance + 4
 
             successful = .true.
         end subroutine
@@ -376,18 +376,18 @@ module messagepack_user
 
             integer(kind=int64) :: temp, temp1, temp2
 
-            if (size(buffer(byteadvance:)) < 8) then
+            if (size(buffer(byteadvance+1:)) < 8) then
                 successful = .false.
                 return
             end if
 
-            temp = bytes_be_to_int_8(buffer(byteadvance:byteadvance+7), is_little_endian)
+            temp = bytes_be_to_int_8(buffer(byteadvance+1:byteadvance+8), is_little_endian)
             temp1 = 0
             temp2 = 0
             call mvbits(temp, 0, 34, temp1, 0)
             call mvbits(temp, 34, 30, temp2, 0)
             mpv = mp_timestamp_type(temp1, temp2)
-            byteadvance = byteadvance + 7
+            byteadvance = byteadvance + 8
 
             successful = .true.
         end subroutine
@@ -402,14 +402,14 @@ module messagepack_user
             integer(kind=int32) :: temp
             integer(kind=int64) :: temp2
 
-            if (size(buffer(byteadvance:)) /= 12) then
+            if (size(buffer(byteadvance+1:)) < 12) then
                 successful = .false.
                 return
             end if
 
-            temp = bytes_be_to_int_4(buffer(byteadvance:byteadvance+3), is_little_endian)
+            temp = bytes_be_to_int_4(buffer(byteadvance+1:byteadvance+4), is_little_endian)
             byteadvance = byteadvance + 4
-            temp2 = bytes_be_to_int_8(buffer(byteadvance:byteadvance+7), is_little_endian)
+            temp2 = bytes_be_to_int_8(buffer(byteadvance+1:byteadvance+8), is_little_endian)
             mpv = mp_timestamp_type(temp2, temp)
             byteadvance = byteadvance + 8
 

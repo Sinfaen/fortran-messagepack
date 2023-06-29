@@ -36,6 +36,14 @@ module messagepack_unpack
 
             successful = .true.   ! initially set to true
             call unpack_value(settings, buffer, byteadvance, mpv, successful)
+
+            if (byteadvance < size(buffer)) then
+                print *, "[Warning: Extra", size(buffer) - byteadvance, "bytes unused"
+            else if (byteadvance > size(buffer)) then
+                successful = .false. ! bug within reporting byte mechanism
+                print *, "[Error: internal error byteadvance beyond buffer length"
+                print *, byteadvance, "=/=", size(buffer)
+            end if
         end subroutine
 
         recursive subroutine unpack_value(settings, buffer, byteadvance, &
@@ -90,7 +98,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 2 ! start at next object
+                byteadvance = 1
                 call unpack_map(settings, val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_FA_L:MP_FA_H)
@@ -100,7 +108,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 2 ! start at next object
+                byteadvance = 1
                 call unpack_array(settings, btemp1 + 0_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_FS_L:MP_FS_H)
@@ -191,7 +199,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(3)
-                byteadvance = 4
+                byteadvance = 3
                 call unpack_ext(settings, int8_as_unsigned(buffer(2)) + 0_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_E16)
@@ -201,7 +209,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(4)
-                byteadvance = 5
+                byteadvance = 4
                 val_int16 = bytes_be_to_int_2(buffer(2:3), settings%is_little_endian)
                 call unpack_ext(settings, val_int16 + 0_int64, &
                     i, buffer, byteadvance, mpv, successful)
@@ -212,7 +220,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(6)
-                byteadvance = 7
+                byteadvance = 6
                 val_int32 = bytes_be_to_int_4(buffer(2:5), settings%is_little_endian)
                 call unpack_ext(settings, val_int32 + 0_int64, &
                     i, buffer, byteadvance, mpv, successful)
@@ -318,7 +326,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 3
+                byteadvance = 2
                 call unpack_ext(settings, 1_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE2)
@@ -328,7 +336,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 3
+                byteadvance = 2
                 call unpack_ext(settings, 2_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE4)
@@ -338,7 +346,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 3
+                byteadvance = 2
                 call unpack_ext(settings, 4_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE8)
@@ -348,7 +356,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 3
+                byteadvance = 2
                 call unpack_ext(settings, 8_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE16)
@@ -358,7 +366,7 @@ module messagepack_unpack
                     return
                 end if
                 i = buffer(2)
-                byteadvance = 3
+                byteadvance = 2
                 call unpack_ext(settings, 16_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_S8)
@@ -413,7 +421,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 4 ! start at next object
+                byteadvance = 3
                 call unpack_array(settings, int(val_int32, kind=int64), &
                     buffer, byteadvance, mpv, successful)
             case (MP_A32)
@@ -424,7 +432,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 6 ! start at next object
+                byteadvance = 5
                 call unpack_array(settings, val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_M16)
@@ -435,7 +443,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 4 ! start at next object
+                byteadvance = 3
                 call unpack_map(settings, 0_int64 + val_int32, buffer, byteadvance, &
                     mpv, successful)
             case (MP_M32)
@@ -446,7 +454,7 @@ module messagepack_unpack
                     successful = .false.
                     return
                 end if
-                byteadvance = 6 ! start at next object
+                byteadvance = 5
                 call unpack_map(settings, val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_NFI_L:MP_NFI_H)
@@ -469,7 +477,7 @@ module messagepack_unpack
             class(mp_value_type), allocatable :: val_any
             mpv = mp_arr_type(length)
             do i = 1,length
-                call unpack_value(settings, buffer(byteadvance:), tmp, &
+                call unpack_value(settings, buffer(byteadvance+1:), tmp, &
                     val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
@@ -506,7 +514,7 @@ module messagepack_unpack
             mpv = mp_map_type(length)
             do i = 1,length
                 ! get key
-                call unpack_value(settings, buffer(byteadvance:), &
+                call unpack_value(settings, buffer(byteadvance+1:), &
                     tmp, val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
@@ -524,7 +532,7 @@ module messagepack_unpack
                 end select
 
                 ! get value
-                call unpack_value(settings, buffer(byteadvance:), tmp, &
+                call unpack_value(settings, buffer(byteadvance+1:), tmp, &
                     val_any, successful)
                 byteadvance = byteadvance + tmp
                 if (.not. successful) then
@@ -621,8 +629,8 @@ module messagepack_unpack
             select type(mpv)
             type is (mp_value_type)
             class is (mp_ext_type)
-                mpv%values = buffer(byteadvance:byteadvance+length-1)
-                byteadvance = byteadvance + length - 1
+                mpv%values = buffer(byteadvance+1:byteadvance+length)
+                byteadvance = byteadvance + length
             class default
                 successful = .false.
                 deallocate(mpv)
