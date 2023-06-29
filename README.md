@@ -27,15 +27,14 @@ program test
     ! base class used to interact with MsgPack
     class(mp_value_type), allocatable :: mp_value
     ! object used to store various settings
-    class(mp_settings), allocatable :: mps
-    logical :: error ! error flag
+    class(msgpack), allocatable :: mp
 
     integer :: unpacked_value
 
-    mps = mp_settings() ! get default settings
+    mp = msgpack()
 
-    call unpack_stream(mps, buffer, mp_value, error)
-    if (error) then
+    call mp%unpack(buffer, mp_value)
+    if (mp%failed()) then
         ! insert error handling here
         stop 1
     end if
@@ -58,10 +57,9 @@ program test
     ! buffer to fill with MsgPack data
     byte, allocatable, dimension(:) :: buffer
     ! object used to store various settings
-    class(mp_settings), allocatable :: mps
-    logical :: error ! error flag
+    class(msgpack), allocatable :: mp
 
-    mps = mp_settings() ! get default settings
+    mp = msgpack() ! get default settings
 
     ! create an array with two elements:
     ! ["hello world", .false.]
@@ -71,14 +69,14 @@ program test
     mp_arr%value(2)%obj = mp_bool_type(.false.)
 
     ! pack the value into a dynamically allocated array
-    call pack_alloc(buffer, mp_deserialized, error)
-    if (error) then
+    call mp%pack_alloc(buffer, mp_deserialized)
+    if (mp%failed()) then
         ! insert error handling here
         stop 1
     end if
 
     ! print the messagepack object in a pretty way
-    call mp_s%print_value(mp_deserialized)
+    call mp%print_value(mp_deserialized)
 
     deallocate(buffer)
     deallocate(mp_deserialized)
@@ -102,12 +100,34 @@ The `mp_value_type` contains the following type-bound procedures:
 | getsize | All | Returns number of bytes taken up by the object |
 | pack | All | Internal use only |
 
-### mp_settings
+### msgpack
 
-A special class called `mp_settings` is used to store extra information related to the pack/unpack process. For the most part the user does not need to interact with this class, only instantiate an instance and pass it into the appropriate functions where needed.
+A class called `msgpack` handles all unpacking & packing procedures. It also handles custom user extensions and configurable error handling.
 
-Hoever, the class does present some useful debugging functions:
+Most commonly used functions:
 ```fortran
+subroutine pack_alloc(this, mpv, buffer)
+    ! Packs a messagepack object into a dynamically
+    ! allocated buffer, returned to the user. The user
+    ! must handle deallocation.
+    ! @param[in] this - self
+    ! @param[in] mpv - messagepack value to pack
+    ! @param[out] buffer - contains serialized data
+end subroutine
+subroutine pack_prealloc(this, mpv, buffer)
+    ! Packs a messagepack object into a pre-allocated buffer,
+    ! returned to the user. This function does not check beforehand
+    ! for the array being the correct size, and will return an error
+    ! if the buffer is too small.
+    ! @param[in] this - self
+    ! @param[in] mpv - messagepack value to pack
+    ! @param[out] buffer - existing buffer to place data into
+end subroutine
+subroutine unpack(this, buffer, mpv)
+    ! @param[in] this - self
+    ! @param[in] buffer - serialized messagepack data
+    ! @param[out] mpv - Deserialized value
+end subroutine
 subroutine print_value(this, obj)
     ! Prints MessagePack object with default options
     ! @param[in] this - instance
@@ -125,13 +145,13 @@ recursive subroutine print_value_with_args(this, obj, indentation, &
     ! @param[in] maxelems - if non-negative, limits number of elements printed
     ! @returns None
 end subroutine
+
+subroutine print_version() ! prints version of messagepack
 ```
 
 ### Additional Items
-The library exposes the following two global subroutines:
+The library exposes the following global subroutines:
 ```fortran
-subroutine print_version() ! prints version of messagepack
-
 subroutine print_bytes_as_hex(bytes, addhexmark)
     ! prints a buffer of bytes as the unsigned hex version
     ! @param[in] bytes - byte buffer to print
@@ -366,6 +386,7 @@ Tests integrated into Meson:
 | constructors | Unit test of constructors. Also serves as example |
 | packing | Unit testing of packing with checks on the packed buffers |
 | unpacking | Unit test of unpacking with known packed buffers |
+| roundtrip | Unit test of packing data, and then unpacking |
 
 | Build System | Command |
 | --- | --- |
