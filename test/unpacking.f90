@@ -3,7 +3,7 @@ program unpacking
     implicit none
 
     ! variables to use
-    class(mp_settings), allocatable :: mp_s
+    class(msgpack), allocatable :: mp
     byte, allocatable, dimension(:) :: stream ! buffer of bytes
     class(mp_value_type), allocatable :: mpv  ! pointer to value
     integer :: i, i_tmp
@@ -22,14 +22,14 @@ program unpacking
 
     print *, "Unpacking test"
     call print_endianness()
-    mp_s = mp_settings()
+    mp = msgpack()
 
     ! positive fix int test: VALUE = 45
     allocate(stream(1))
     stream(1) = 45
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream (PFI)"
         stop 1
     end if
@@ -48,9 +48,9 @@ program unpacking
     ! negative fix int test: VALUE = -2
     allocate(stream(1))
     stream(1) = -30 ! 0b11100010 as int8
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream (NFI)"
         stop 1
     end if
@@ -73,9 +73,9 @@ program unpacking
     stream(3) = -102_int8 ! 0x9a
     stream(4) =  -55_int8 ! 0xc9
     stream(5) =   -1_int8 ! 0xff
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(UInt32)"
         stop 1
     end if
@@ -104,9 +104,9 @@ program unpacking
     stream(7) =    0 ! 0x00
     stream(8) =    5 ! 0x05
     stream(9) =   65 ! 0x41
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(UInt64 big)"
         stop 1
     end if
@@ -132,9 +132,9 @@ program unpacking
     stream(3) = 101 ! e
     stream(4) = 103 ! g
     stream(5) = 111 ! o
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixstr)"
         stop 1
     end if
@@ -161,9 +161,9 @@ program unpacking
     stream(4) = MP_I16 ! int 16 byte mark
     stream(5) = 125 ! 0x7d
     stream(6) = 0   ! 0x00
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixarr)"
         stop 1
     end if
@@ -207,9 +207,9 @@ program unpacking
         stream(11 + i) = MP_T
     end do
     stream(20) = MP_NIL
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: unpacking stream(array16)"
         stop 1
     end if
@@ -254,9 +254,9 @@ program unpacking
         stream(7+3*(i-1)) = 1
         stream(8+3*(i-1)) = int(modulo(i, 27), kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: unpacking stream(array32)"
         stop 1
     end if
@@ -325,9 +325,9 @@ program unpacking
     stream(27) = ior(MP_FA_L, 2) ! fixarr byte mark
     stream(28) =   4 ! positive fix int
     stream(29) = -30 ! 0b11100010 as int8
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixmap)"
         stop 1
     end if
@@ -426,9 +426,9 @@ program unpacking
         stream(6+4*(i-1)) = 2
         stream(7+4*(i-1)) = int(modulo(i, 11), kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(map16)"
         stop 1
     end if
@@ -486,9 +486,9 @@ program unpacking
         stream(9 +5*(i-1)) = int(modulo(i, 6), kind=int8)
         stream(10+5*(i-1)) = int(modulo(i, 14), kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(map32)"
         stop 1
     end if
@@ -539,9 +539,9 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 2) = int(i, kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
         stop 1
     end if
@@ -570,9 +570,9 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 3) = int(modulo(i, 35), kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
         stop 1
     end if
@@ -603,9 +603,9 @@ program unpacking
     do i = 1,i_tmp
         stream(i + 5) = int(modulo(i, 25) * modulo(i, 14), kind=int8)
     end do
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
         stop 1
     end if
@@ -632,9 +632,9 @@ program unpacking
     stream(2) = 4 ! type
     stream(3) = 2 ! data
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -671,9 +671,9 @@ program unpacking
     stream(3) = -1 ! data
     stream(4) = -2
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -712,9 +712,9 @@ program unpacking
     stream(5) = 100
     stream(6) = -20
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -748,9 +748,9 @@ program unpacking
         stream(2+i) = int(i, kind=int8)
     end do
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -784,9 +784,9 @@ program unpacking
         stream(2+i) = int(-i, kind=int8)
     end do
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -821,9 +821,9 @@ program unpacking
     stream(5) = 2
     stream(6) = 3
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -863,9 +863,9 @@ program unpacking
         stream(4 + i) = int(401 - i, kind=int8)
     end do
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -909,9 +909,9 @@ program unpacking
         stream(6 + i) = int(modulo(i, 3_int8), kind=int8)
     end do
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
         stop 1
     end if
@@ -952,9 +952,9 @@ program unpacking
     stream(5) = 1  ! 0x01
     stream(6) = 44 ! 0x2c
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp32)"
         stop 1
     end if
@@ -989,9 +989,9 @@ program unpacking
     stream(9) = 0 ! 0x00
     stream(10) = 0 ! 0x00
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp64)"
         stop 1
     end if
@@ -1032,9 +1032,9 @@ program unpacking
     stream(14) = -1 ! 0xff
     stream(15) = 56 ! 0x38
 
-    call unpack_stream(mp_s, stream, mpv, status)
+    call mp%unpack(stream, mpv)
     deallocate(stream)
-    if (.not.(status)) then
+    if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp96)"
         stop 1
     end if

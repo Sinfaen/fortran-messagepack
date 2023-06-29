@@ -13,7 +13,7 @@ program packing
     class(mp_ext_type), allocatable :: ext_test
     clasS(mp_timestamp_type), allocatable :: ts_test
 
-    class(mp_settings), allocatable :: mp_s
+    class(msgpack), allocatable :: mp
 
     byte, allocatable, dimension(:) :: buf
     character(:), allocatable :: small_text
@@ -34,11 +34,11 @@ program packing
     int_test = mp_int_type(4)
 
     print *, "Packing test"
-    mp_s = mp_settings()
+    mp = msgpack()
 
     ! positive fix int test
-    call pack_alloc(int_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(int_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack int"
         stop 1
     end if
@@ -58,8 +58,8 @@ program packing
 
     ! negative fix int test
     int_test = mp_int_type(-5)
-    call pack_alloc(int_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(int_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack NFI"
         stop 1
     end if
@@ -83,8 +83,8 @@ program packing
     small_text = small_text // "nd if you don't keep your feet, there's "
     small_text = small_text // "no knowing where you might be swept off to."
     str_test = mp_str_type(small_text)
-    call pack_alloc(str_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(str_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack Str8"
         stop 1
     end if
@@ -124,8 +124,8 @@ program packing
     arr_test%value(2)%obj = new_real64(-2.03_8)
     arr_test%value(3)%obj = mp_str_type("mochi")
     arr_test%value(4)%obj = mp_bool_type(.true.)
-    call pack_alloc(arr_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(arr_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixarray"
         stop 1
     end if
@@ -151,8 +151,8 @@ program packing
     do i = 1,16384
         arr_test%value(i)%obj = mp_int_type(modulo(i, 120) + 3)
     end do
-    call pack_alloc(arr_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(arr_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack array16"
         stop 1
     end if
@@ -189,8 +189,8 @@ program packing
     do i = 1,1048576
         arr_test%value(i)%obj = mp_int_type(199 + modulo(i, 57))
     end do
-    call pack_alloc(arr_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(arr_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack array32"
         stop 1
     end if
@@ -241,8 +241,8 @@ program packing
     map_test%values(2)%obj = mp_nil_type()
     map_test%keys(3)%obj   = mp_int_type(3)
     map_test%values(3)%obj = arr_test
-    call pack_alloc(map_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(map_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixmap"
         stop 1
     end if
@@ -269,8 +269,8 @@ program packing
         map_test%keys(i)%obj = mp_int_type(-i)
         map_test%values(i)%obj = mp_bool_type(modulo(i, 2) == 0)
     end do
-    call pack_alloc(map_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(map_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack map16"
         stop 1
     end if
@@ -320,8 +320,8 @@ program packing
         map_test%keys(i)%obj   = new_real32(i + 0.0)
         map_test%values(i)%obj = new_real32(log(i + 0.0))
     end do
-    call pack_alloc(map_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(map_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack map32"
         stop 1
     end if
@@ -343,9 +343,8 @@ program packing
         do i = 1,65536
             j = 5 + (10*i) - 9 ! start index
             ! key checking
-            call unpack_stream(mp_s, buf(j:j + 4), &
-                mp_val, success)
-            if (.not. success) then
+            call mp%unpack(buf(j:j + 4), mp_val)
+            if (mp%failed()) then
                 print *, "[Error: failed to unpack map32 key at", i
                 stop 1
             end if
@@ -359,9 +358,8 @@ program packing
             end if
             deallocate(mp_val)
             ! value checking
-            call unpack_stream(mp_s, buf(j+5:j+9), &
-                mp_val, success)
-            if (.not. success) then
+            call mp%unpack(buf(j+5:j+9), mp_val)
+            if (mp%failed()) then
                 print *, "[Error: failed to unpack map32 value at", i
             end if
             call get_real(mp_val, rval, success)
@@ -383,8 +381,8 @@ program packing
     ! fixext1 test
     ext_test = mp_ext_type(5, 1_int64)
     ext_test%values(1) = 71
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixext1"
         stop 1
     end if
@@ -410,8 +408,8 @@ program packing
     ext_test = mp_ext_type(-2, 2_int64)
     ext_test%values(1) = 19
     ext_test%values(2) = 100
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixext2"
         stop 1
     end if
@@ -439,8 +437,8 @@ program packing
     ext_test%values(2) = 1
     ext_test%values(3) = 2
     ext_test%values(4) = 3
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixext4"
         stop 1
     end if
@@ -472,8 +470,8 @@ program packing
     ext_test%values(6) = -5
     ext_test%values(7) = -6
     ext_test%values(8) = -7
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixext8"
         stop 1
     end if
@@ -500,8 +498,8 @@ program packing
     do i=1,16
         ext_test%values(i) = i*i - 10*i
     end do
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack fixext16"
         stop 1
     end if
@@ -528,8 +526,8 @@ program packing
     ext_test%values(1) = 77
     ext_test%values(2) = 76
     ext_test%values(3) = 75
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack ext8"
         stop 1
     end if
@@ -556,8 +554,8 @@ program packing
     do i=1,300
         ext_test%values(i) = modulo(i, 13)
     end do
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack ext16"
         stop 1
     end if
@@ -592,8 +590,8 @@ program packing
     do i=1,70000
         ext_test%values(i) = modulo(-i, 14)
     end do
-    call pack_alloc(ext_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ext_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack ext32"
         stop 1
     end if
@@ -627,8 +625,8 @@ program packing
 
     ! timestamp32 test
     ts_test = mp_timestamp_type(50, 0)
-    call pack_alloc(ts_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ts_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack timestamp32"
         stop 1
     end if
@@ -651,8 +649,8 @@ program packing
     ! timestamp64 test
     ! 0x000003a0 000088b8
     ts_test = mp_timestamp_type(35000, 232)
-    call pack_alloc(ts_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ts_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack timestamp64"
         stop 1
     end if
@@ -686,8 +684,8 @@ program packing
     ! 0x000004d2
     ! 0xfffffffffffff830
     ts_test = mp_timestamp_type(-2000, 1234)
-    call pack_alloc(ts_test, buf, errored)
-    if (errored) then
+    call mp%pack_alloc(ts_test, buf)
+    if (mp%failed()) then
         print *, "[Error: failed to pack timestamp96"
         stop 1
     end if
