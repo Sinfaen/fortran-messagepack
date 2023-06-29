@@ -634,6 +634,9 @@ module messagepack_value
             case (MP_B32)
                 writeindex = 6
                 call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            case (MP_NU)
+                error = .true.
+                return
             end select
             buf(writeindex:writeindex+length-1) = this%value
 
@@ -670,6 +673,9 @@ module messagepack_value
             case (MP_A32)
                 writeindex = 6
                 call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            case (MP_NU)
+                error = .true.
+                return
             end select
             do i = 1,length
                 call this%value(i)%obj%pack(buf(writeindex:), error)
@@ -713,6 +719,9 @@ module messagepack_value
             case (MP_M32)
                 writeindex = 6
                 call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
+            case (MP_NU)
+                error = .true.
+                return
             end select
             do i = 1,length
                 call this%keys(i)%obj%pack(buf(writeindex:), error)
@@ -756,7 +765,7 @@ module messagepack_value
                 buf(2) = int(this%exttype, kind=int8)
                 buf(3:3+length-1) = this%values
             case (MP_E8)
-                buf(2) = length
+                buf(2) = int(length, kind=int8)
                 buf(3) = int(this%exttype, kind=int8)
                 buf(4:4+length-1) = this%values
             case (MP_E16)
@@ -767,6 +776,9 @@ module messagepack_value
                 call int_to_bytes_be_4(buf(2:5), int(length, kind=int32))
                 buf(6) = int(this%exttype, kind=int8)
                 buf(7:7+length-1) = this%values
+            case (MP_NU)
+                error = .true.
+                return
             end select
 
             error = .false.
