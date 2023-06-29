@@ -10,7 +10,7 @@ module messagepack_user
 
     private
 
-    public :: mp_settings, unpack_func, unpack_callback
+    public :: msgpack, unpack_func, unpack_callback
     public :: mp_timestamp_type, is_timestamp, get_timestamp_ref, register_extension
 
     integer, parameter, public :: MP_TS_EXT = -1
@@ -30,10 +30,9 @@ module messagepack_user
         procedure(unpack_func), pointer, nopass :: cb => null()
     end type
 
-    ! defines settings used for serialization & deserialization with
-    ! this library.
-    ! - stores 
-    type :: mp_settings
+    ! top level class where user is expected to interact with
+    ! messagepack utilities
+    type :: msgpack
         class(unpack_callback), allocatable, dimension(:) :: f1
         class(unpack_callback), allocatable, dimension(:) :: f2
         class(unpack_callback), allocatable, dimension(:) :: f4
@@ -52,14 +51,24 @@ module messagepack_user
         logical, dimension(256) :: e32_allocated
 
         logical :: is_little_endian
+        logical :: fail_flag
     contains
         procedure :: register_extension
         procedure :: register_extension_super
         procedure :: print_value
         procedure :: print_value_with_args
+        procedure :: print_version
+        procedure :: failed
+        procedure :: pack_alloc
+        procedure :: pack_prealloc
+        procedure :: unpack
+        procedure :: unpack_value
+        procedure :: unpack_map
+        procedure :: unpack_ext
+        procedure :: unpack_array
     end type
-    interface mp_settings
-        procedure :: new_settings
+    interface msgpack
+        procedure :: new_mp
     end interface
     
     ! #region messagepack defined extensions go here
@@ -76,39 +85,50 @@ module messagepack_user
     ! #endregion
 
     contains
-        type(mp_settings) function new_settings()
+        type(msgpack) function new_mp()
             logical :: err
             procedure(unpack_func), pointer :: p
             integer :: i
-            allocate(new_settings%f1(256))
-            allocate(new_settings%f2(256))
-            allocate(new_settings%f4(256))
-            allocate(new_settings%f8(256))
-            allocate(new_settings%f16(256))
-            allocate(new_settings%e8(256))
-            allocate(new_settings%e16(256))
-            allocate(new_settings%e32(256))
+            allocate(new_mp%f1(256))
+            allocate(new_mp%f2(256))
+            allocate(new_mp%f4(256))
+            allocate(new_mp%f8(256))
+            allocate(new_mp%f16(256))
+            allocate(new_mp%e8(256))
+            allocate(new_mp%e16(256))
+            allocate(new_mp%e32(256))
             do i = 1,256
-                new_settings%f1_allocated = .false.
-                new_settings%f2_allocated = .false.
-                new_settings%f4_allocated = .false.
-                new_settings%f8_allocated = .false.
-                new_settings%f16_allocated = .false.
-                new_settings%e8_allocated = .false.
-                new_settings%e16_allocated = .false.
-                new_settings%e32_allocated = .false.
+                new_mp%f1_allocated  = .false.
+                new_mp%f2_allocated  = .false.
+                new_mp%f4_allocated  = .false.
+                new_mp%f8_allocated  = .false.
+                new_mp%f16_allocated = .false.
+                new_mp%e8_allocated  = .false.
+                new_mp%e16_allocated = .false.
+                new_mp%e32_allocated = .false.
             end do
 
             ! AFAIK there is no stdlib equivalent of C++20 std::endian
-            new_settings%is_little_endian = detect_little_endian()
+            new_mp%is_little_endian = detect_little_endian()
+            new_mp%fail_flag = .false.
 
             ! add timestamp here
             p => unpack_timestamp_32
-            call new_settings%register_extension_super(MP_FE4, -1_int8, p, err)
+            call new_mp%register_extension_super(MP_FE4, -1_int8, p, err)
             p => unpack_timestamp_64
-            call new_settings%register_extension_super(MP_FE8, -1_int8, p, err)
+            call new_mp%register_extension_super(MP_FE8, -1_int8, p, err)
             p => unpack_timestamp_96
-            call new_settings%register_extension_super(MP_E8, -1_int8, p, err)
+            call new_mp%register_extension_super(MP_E8, -1_int8, p, err)
+        end function
+
+        subroutine print_version(this)
+            class(msgpack) :: this
+            print *, "0.1.3"
+        end subroutine
+
+        logical function failed(this)
+            class(msgpack) :: this
+            failed = this%fail_flag
         end function
 
         type(mp_timestamp_type) function new_timestamp(sec, ns)
@@ -121,7 +141,7 @@ module messagepack_user
         subroutine register_extension(this, ext, typeid, cb, error)
             ! Registers callbacks for handling extensions
             ! Only allows registering ids [0 127]
-            class(mp_settings) :: this
+            class(msgpack) :: this
             integer, intent(in) :: ext
             integer(kind=int8), intent(in) :: typeid
             procedure(unpack_func), pointer, intent(in) :: cb
@@ -137,7 +157,7 @@ module messagepack_user
         subroutine register_extension_super(this, ext, typeid, cb, error)
             ! Registers callbacks for handling extensions
             ! allows ids [-128 127]
-            class(mp_settings) :: this
+            class(msgpack) :: this
             integer, intent(in) :: ext
             integer(kind=int8), intent(in) :: typeid
             procedure(unpack_func), pointer, intent(in) :: cb
@@ -177,11 +197,77 @@ module messagepack_user
             error = .false.
         end subroutine
 
+        logical function check_length_and_print(need, actual)
+            integer(kind=int64), intent(in) :: need
+            integer(kind=int64), intent(in) :: actual
+            if (actual < need) then
+                print *, "Not enough bytes for type"
+                check_length_and_print = .false.
+            else
+                check_length_and_print = .true.
+            end if
+        end function
+
+        ! PACKING
+        subroutine pack_alloc(this, mpv, buffer)
+            ! Packs a messagepack object into a dynamically
+            ! allocated buffer, returned to the user. The user
+            ! must handle deallocation.
+            ! @param[in] this - self
+            ! @param[in] mpv - messagepack value to pack
+            ! @param[out] buffer - will contain serialized data
+            class(msgpack) :: this
+            class(mp_value_type) :: mpv
+            byte, allocatable, dimension(:), intent(out) :: buffer
+            integer(kind=int64) dblen
+
+            call mpv%getsize(dblen) ! get buffer size required
+            allocate(buffer(dblen)) ! allocate buffer
+
+            call mpv%pack(buffer, this%fail_flag)
+        end subroutine
+
+        subroutine pack_prealloc(this, mpv, buffer)
+            ! Packs a messagepack object into a pre-allocated buffer,
+            ! returned to the user. This function does not check beforehand
+            ! for the array being the correct size, and will return an error
+            ! if the buffer is too small.
+            class(msgpack) :: this
+            class(mp_value_type) :: mpv
+            byte, allocatable, dimension(:), intent(inout) :: buffer
+
+            call mpv%pack(buffer, this%fail_flag)
+        end subroutine
+
+        subroutine unpack(this, buffer, mpv)
+            ! @param[in] this - self
+            ! @param[in] buffer - serialized messagepack data
+            ! @param[out] mpv - Deserialized value
+            class(msgpack) :: this
+            byte, dimension(:), intent(in) :: buffer
+            class(mp_value_type), allocatable, intent(out) :: mpv
+
+            integer(kind=int64) :: byteadvance
+            logical :: successful
+
+            this%fail_flag = .false.
+            call this%unpack_value(buffer, byteadvance, mpv, successful)
+            this%fail_flag = .not.(successful)
+
+            if (byteadvance < size(buffer)) then
+                print *, "[Warning: Extra", size(buffer) - byteadvance, "bytes unused"
+            else if (byteadvance > size(buffer)) then
+                this%fail_flag = .true. ! bug within reporting byte mechanism
+                print *, "[Error: internal error byteadvance beyond buffer length"
+                print *, byteadvance, "=/=", size(buffer)
+            end if
+        end subroutine
+
         subroutine print_value(this, obj)
             ! Prints MessagePack object with default options
             ! @param[in] this - instance
             ! @param[in] obj - MessagePack object to print
-            class(mp_settings) :: this
+            class(msgpack) :: this
             class(mp_value_type), intent(in) :: obj
             call this%print_value_with_args(obj, 0, .false., -1)
         end subroutine
@@ -195,7 +281,7 @@ module messagepack_user
             ! @param[in] sameline - if true, compacts the output
             ! @param[in] maxelems - if non-negative, limits number of elements printed
             ! @returns None
-            class(mp_settings), intent(in) :: this
+            class(msgpack), intent(in) :: this
             class(mp_value_type), intent(in) :: obj
             integer, intent(in) :: indentation
             logical, intent(in) :: sameline
@@ -441,6 +527,599 @@ module messagepack_user
                 stat = .true.
             class default
                 stat = .false.
+            end select
+        end subroutine
+
+        ! unpacking shenanigans
+        recursive subroutine unpack_value(this, buffer, byteadvance, &
+                mpv, successful)
+            class(msgpack) :: this
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(out) :: byteadvance
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            ! other variables to use
+            integer(kind=int64) :: length
+            integer :: i
+            integer(kind=int64) :: i_64
+            byte :: btemp1 ! byte temp value
+            integer(kind=int16) :: val_int16
+            integer(kind=int32) :: val_int32
+            integer(kind=int64) :: val_int64
+
+            integer(kind=int64) :: header_size
+            character(:), allocatable :: val_char
+
+            length = size(buffer)
+
+            ! set default output values
+            successful = .true.
+
+            ! need to have data available to read
+            if (length == 0) then
+                successful = .false.
+                print *, "Buffer is empty"
+                return
+            end if
+
+            ! check that the size for the entire header exists
+            header_size = get_header_size_by_type(buffer(1))
+            if (.not. check_length_and_print(header_size, length)) then
+                successful = .false.
+                return
+            end if
+
+            byteadvance = 1 ! default output value
+            select case (buffer(1))
+            case (MP_PFI_L:MP_PFI_H)
+                ! the byte itself is the value
+                mpv = mp_int_type(buffer(1))
+            case (MP_FM_L:MP_FM_H)
+                btemp1 = 0
+                call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixmap length
+                val_int64 = btemp1
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 1
+                call this%unpack_map(val_int64, buffer, byteadvance, &
+                    mpv, successful)
+            case (MP_FA_L:MP_FA_H)
+                btemp1 = 0
+                call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixarray length
+                if (.not. check_length_and_print(1_int64 + btemp1, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 1
+                call this%unpack_array(btemp1 + 0_int64, buffer, byteadvance, &
+                    mpv, successful)
+            case (MP_FS_L:MP_FS_H)
+                btemp1 = 0
+                call mvbits(buffer(1), 0, 5, btemp1, 0) ! get fixstr length
+                if (.not. check_length_and_print(1_int64 + btemp1, length)) then
+                    successful = .false.
+                    return
+                end if
+                allocate(character(btemp1) :: val_char)
+                do i = 1,btemp1
+                    val_char(i:i) = transfer(buffer(1 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
+                byteadvance = 1 + btemp1
+            case (MP_NIL)
+                ! default is already nil
+                mpv = mp_nil_type()
+            case (MP_NU)
+                print *, "Error, never used detected"
+                successful = .false.
+            case (MP_F)
+                mpv = mp_bool_type(.false.)
+            case (MP_T)
+                mpv = mp_bool_type(.true.)
+            ! binary format family
+            case (MP_B8)
+                ! check that the remaining number of bytes exist
+                val_int32 = int8_as_unsigned(buffer(2))
+                val_int64 = val_int32
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(3:2+val_int64)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+                byteadvance = 2 + val_int64
+            case (MP_B16)
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                val_int64 = int16_as_unsigned(val_int16)
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(4:3+val_int64)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+                byteadvance = 3 + val_int64
+            case (MP_B32)
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                val_int64 = int32_as_unsigned(val_int32)
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_bin_type(val_int64)
+                ! copy data
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_bin_type)
+                    mpv%value(:) = buffer(6:5+val_int64)
+                class default
+                    successful = .false.
+                    print *, "[Error: something went terribly wrong"
+                end select
+                byteadvance = 5 + val_int64
+            case (MP_E8)
+                ! check for first 3 bytes
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(3)
+                byteadvance = 3
+                call this%unpack_ext(int8_as_unsigned(buffer(2)) + 0_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_E16)
+                ! check for first 4 bytes
+                if (.not. check_length_and_print(4_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(4)
+                byteadvance = 4
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                call this%unpack_ext(val_int16 + 0_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_E32)
+                ! check for first 6 bytes
+                if (.not. check_length_and_print(6_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(6)
+                byteadvance = 6
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                call this%unpack_ext(val_int32 + 0_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_F32)
+                ! 4 bytes following
+                if (.not. check_length_and_print(5_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = new_real32(bytes_be_to_real_4(buffer(2:5), &
+                    this%is_little_endian))
+                byteadvance = 5
+            case (MP_F64)
+                ! 8 bytes following
+                if (.not. check_length_and_print(9_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = new_real64(bytes_be_to_real_8(buffer(2:9), this%is_little_endian))
+                byteadvance = 9
+            ! Unsigned integers >>>
+            ! need to watch when grabbed values are negative
+            case (MP_U8)
+                ! 1 byte following
+                if (.not. check_length_and_print(2_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_int_type(int8_as_unsigned(buffer(2)))
+                byteadvance = 2
+            case (MP_U16)
+                ! 2 bytes following
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                mpv = mp_int_type(int16_as_unsigned(val_int16))
+                byteadvance = 3
+            case (MP_U32)
+                ! 4 bytes following
+                if (.not. check_length_and_print(5_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                mpv = mp_int_type(int32_as_unsigned(val_int32))
+                byteadvance = 5
+            case (MP_U64)
+                ! 8 bytes following
+                if (.not. check_length_and_print(9_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int64 = bytes_be_to_int_8(buffer(2:9), this%is_little_endian)
+                if (val_int64 >= 0) then
+                    mpv = mp_int_type(val_int64)
+                else
+                    mpv = mp_int_type(val_int64)
+                    call set_unsigned(mpv)
+                end if
+                byteadvance = 9
+            ! Signed integers >>>
+            case (MP_I8)
+                ! 1 byte following
+                if (.not. check_length_and_print(2_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_int_type(buffer(2))
+                byteadvance = 2
+            case (MP_I16)
+                ! 2 bytes following
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                val_int32 = int16_as_unsigned(val_int16)
+                mpv = mp_int_type(val_int32)
+                byteadvance = 3
+            case (MP_I32)
+                ! 4 bytes following
+                if (.not. check_length_and_print(5_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_int_type(bytes_be_to_int_4(buffer(2:5), this%is_little_endian))
+                byteadvance = 5
+            case (MP_I64)
+                ! 8 bytes following
+                if (.not. check_length_and_print(9_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                mpv = mp_int_type(bytes_be_to_int_8(buffer(2:9), this%is_little_endian))
+                byteadvance = 9
+            ! ext format family
+            case (MP_FE1)
+                ! 3 bytes following
+                if (.not. check_length_and_print(3_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call this%unpack_ext(1_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_FE2)
+                ! 4 bytes following
+                if (.not. check_length_and_print(4_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call this%unpack_ext(2_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_FE4)
+                ! 6 bytes following
+                if (.not. check_length_and_print(6_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call this%unpack_ext(4_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_FE8)
+                ! 8 bytes following
+                if (.not. check_length_and_print(8_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call this%unpack_ext(8_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_FE16)
+                ! 18 bytes following
+                if (.not. check_length_and_print(18_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                i = buffer(2)
+                byteadvance = 2
+                call this%unpack_ext(16_int64, &
+                    i, buffer, byteadvance, mpv, successful)
+            case (MP_S8)
+                ! check that the remaining number of bytes exist
+                val_int16 = int8_as_unsigned(buffer(2))
+                if (.not. check_length_and_print(2_int64 + val_int16, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int16) :: val_char)
+                do i = 1,val_int16
+                    val_char(i:i) = transfer(buffer(2 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
+                byteadvance = 1 + val_int16
+            case (MP_S16)
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                val_int32 = int16_as_unsigned(val_int16)
+                if (.not. check_length_and_print(3_int64 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int32) :: val_char)
+                do i = 1,val_int32
+                    val_char(i:i) = transfer(buffer(3 + i), 'a')
+                end do
+                mpv = mp_str_type(val_char)
+                byteadvance = 1 + val_int32
+            case (MP_S32)
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                val_int64 = int32_as_unsigned(val_int32)
+                if (5 + val_int64 > length) then
+                    successful = .false.
+                    return
+                end if
+                ! create string
+                allocate(character(val_int64) :: val_char)
+                do i_64 = 1_int64,val_int64
+                    val_char(i_64:i_64) = transfer(buffer(3 + i_64), 'a')
+                end do
+                mpv = mp_str_type(val_char)
+                byteadvance = 1_int64 + val_int64
+            case (MP_A16)
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                val_int32 = int16_as_unsigned(val_int16)
+                if (.not. check_length_and_print(1_int64 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 3
+                call this%unpack_array(int(val_int32, kind=int64), &
+                    buffer, byteadvance, mpv, successful)
+            case (MP_A32)
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                val_int64 = int32_as_unsigned(val_int32)
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 5
+                call this%unpack_array(val_int64, buffer, byteadvance, &
+                    mpv, successful)
+            case (MP_M16)
+                ! check that the remaining number of bytes exist
+                val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                val_int32 = int16_as_unsigned(val_int16)
+                if (.not. check_length_and_print(1_int64 + val_int32, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 3
+                call this%unpack_map(0_int64 + val_int32, buffer, byteadvance, &
+                    mpv, successful)
+            case (MP_M32)
+                ! check that the remaining number of bytes exist
+                val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                val_int64 = int32_as_unsigned(val_int32)
+                if (.not. check_length_and_print(1 + val_int64, length)) then
+                    successful = .false.
+                    return
+                end if
+                byteadvance = 5
+                call this%unpack_map(val_int64, buffer, byteadvance, &
+                    mpv, successful)
+            case (MP_NFI_L:MP_NFI_H)
+                ! take the first 5 bits, create a negative value from it
+                btemp1 = ibits(buffer(1), 0, 5)
+                mpv = mp_int_type(-btemp1)
+            end select
+        end subroutine
+
+        recursive subroutine unpack_array(this, length, buffer, &
+                byteadvance, mpv, successful)
+            class(msgpack) :: this
+            integer(kind=int64), intent(in) :: length
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            integer(kind=int64) :: i, tmp
+            class(mp_value_type), allocatable :: val_any
+            mpv = mp_arr_type(length)
+            do i = 1,length
+                call this%unpack_value(buffer(byteadvance+1:), tmp, &
+                    val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    deallocate(mpv)
+                    return
+                end if
+
+                ! store the newly unpacked object into the array
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_arr_type)
+                    mpv%value(i)%obj = val_any
+                class default
+                    successful = .false.
+                    deallocate(mpv)
+                    print *, "[Error: something went terribly wrong"
+                end select
+            end do
+        end subroutine
+
+        recursive subroutine unpack_map(this, length, buffer, byteadvance, &
+                mpv, successful)
+            class(msgpack) :: this
+            integer(kind=int64), intent(in) :: length
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            integer(kind=int64) :: i, tmp
+            class(mp_value_type), allocatable :: val_any
+
+            successful = .true.
+            mpv = mp_map_type(length)
+            do i = 1,length
+                ! get key
+                call this%unpack_value(buffer(byteadvance+1:), &
+                    tmp, val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    deallocate(mpv)
+                    return
+                end if
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_map_type)
+                    mpv%keys(i)%obj = val_any
+                class default
+                    successful = .false.
+                    deallocate(mpv)
+                    print *, "[Error: something went terribly wrong"
+                end select
+
+                ! get value
+                call this%unpack_value(buffer(byteadvance+1:), tmp, &
+                    val_any, successful)
+                byteadvance = byteadvance + tmp
+                if (.not. successful) then
+                    deallocate(mpv)
+                    return
+                end if
+                select type (mpv)
+                type is (mp_value_type)
+                class is (mp_map_type)
+                    mpv%values(i)%obj = val_any
+                class default
+                    successful = .false.
+                    deallocate(mpv)
+                    print *, "[Error: something went terribly wrong"
+                end select
+            end do
+        end subroutine
+
+        subroutine unpack_ext(this, length, etype, buffer, byteadvance, &
+                mpv, successful)
+            class(msgpack) :: this
+            integer(kind=int64), intent(in) :: length
+            integer, intent(in) :: etype
+            byte, dimension(:), intent(in) :: buffer
+            integer(kind=int64), intent(inout) :: byteadvance
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            logical, intent(out) :: successful
+
+            integer :: ind
+            if (length > size(buffer)) then
+                successful = .false.
+                return
+            end if
+
+            ! Custom extension handling
+            ind = etype + 129
+            if (ind < 1 .or. ind > 256) then
+                successful = .false.
+                return
+            end if
+            if (length == 1) then
+                if (this%f1_allocated(ind)) then
+                    call this%f1(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                    return
+                end if
+            else if (length == 2) then
+                if (this%f2_allocated(ind)) then
+                    call this%f2(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                    return
+                end if
+            else if (length == 4) then
+                if (this%f4_allocated(ind)) then
+                    call this%f4(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                    return
+                end if
+            else if (length == 8) then
+                if (this%f8_allocated(ind)) then
+                    call this%f8(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                    return
+                end if
+            else if (length == 16) then
+                if (this%f16_allocated(ind)) then
+                    call this%f16(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 256) then
+                if (this%e8_allocated(ind)) then
+                    call this%e8(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 65536) then
+                if (this%e16_allocated(ind)) then
+                    call this%e16(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                        return
+                end if
+            else if (length < 4294967296_int64) then
+                if (this%e32_allocated(ind)) then
+                    call this%e32(ind)%cb(buffer, byteadvance, &
+                        this%is_little_endian, mpv, successful)
+                        return
+                end if
+            end if
+
+            ! regular extension
+            mpv = mp_ext_type(etype, length)
+            successful = .true.
+            select type(mpv)
+            type is (mp_value_type)
+            class is (mp_ext_type)
+                mpv%values = buffer(byteadvance+1:byteadvance+length)
+                byteadvance = byteadvance + length
+            class default
+                successful = .false.
+                deallocate(mpv)
+                print *, "[Error: something went terribly wrong"
             end select
         end subroutine
 end module

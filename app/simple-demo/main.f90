@@ -9,13 +9,13 @@ program simple_demo
     class(mp_arr_type), allocatable :: mp_arr
     class(mp_bin_type), allocatable :: mp_bin
     logical :: error
-    class(mp_settings), allocatable :: mp_s
+    class(msgpack), allocatable :: mp
     byte, dimension(:), allocatable :: buffer
 
 
     print *, 'Simple MessagePack Demo'
 
-    mp_s = mp_settings()
+    mp = msgpack()
 
     ! complicated example
     mp_arr = mp_arr_type(3_int64)
@@ -41,11 +41,11 @@ program simple_demo
 
     ! print the structure to the user
     print *, "MessagePack map object to be serialized"
-    call mp_s%print_value(mp_map)
+    call mp%print_value(mp_map)
 
     ! pack the data
-    call pack_alloc(mp_map, buffer, error)
-    if (error) then
+    call mp%pack_alloc(mp_map, buffer)
+    if (mp%failed()) then
         print *, "[Error: failed to pack mp_map"
         stop 1
     end if

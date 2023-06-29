@@ -7,16 +7,11 @@ module messagepack
     ! implement file io
     use iso_fortran_env
     use messagepack_value
-    use messagepack_pack
     use messagepack_user
-    use messagepack_unpack
     use byte_utilities
 
     implicit none
 contains
-    subroutine print_version()
-        print *, "0.1.3"
-    end subroutine
 
     subroutine print_bytes_as_hex(bytes, addhexmark)
         ! prints a buffer of bytes as the unsigned hex version

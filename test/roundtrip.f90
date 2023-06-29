@@ -4,7 +4,7 @@ program roundtrip
     implicit none
 
     ! messagepack setup
-    class(mp_settings), allocatable :: mp_s
+    class(msgpack), allocatable :: mp
 
     ! variables to use
     logical :: error
@@ -29,7 +29,7 @@ program roundtrip
     integer(kind=int64) :: i_temp
 
     print *, "Roundtrip test"
-    mp_s = mp_settings()
+    mp = msgpack()
 
     ! map test 1
     mp_arr = mp_arr_type(2_int64)
@@ -45,15 +45,15 @@ program roundtrip
     mp_map%values(3)%obj = mp_arr
 
     ! serialize
-    call pack_alloc(mp_map, buffer, error)
-    if (error) then
+    call mp%pack_alloc(mp_map, buffer)
+    if (mp%failed()) then
         print *, "[Error: failed to pack map#1"
         stop 1
     end if
 
     ! deserialize
-    call unpack_stream(mp_s, buffer, val, error)
-    if (.not.(error)) then
+    call mp%unpack(buffer, val)
+    if (mp%failed()) then
         print *, "[Error: failed to unpack map#1"
         stop 1
     end if
@@ -129,15 +129,15 @@ program roundtrip
     mp_arr%value(9)%obj = mp_bool_type(.true.)
 
     ! serialize
-    call pack_alloc(mp_arr, buffer, error)
-    if (error) then
+    call mp%pack_alloc(mp_arr, buffer)
+    if (mp%failed()) then
         print *, "[Error: failed to pack arr#1"
         stop 1
     end if
 
     ! deserialize
-    call unpack_stream(mp_s, buffer, val, error)
-    if (.not.(error)) then
+    call mp%unpack(buffer, val)
+    if (mp%failed()) then
         print *, "[Error: failed to unpack arr#1"
         stop 1
     end if
