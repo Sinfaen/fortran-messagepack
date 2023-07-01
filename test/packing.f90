@@ -40,6 +40,7 @@ program packing
     call mp%pack_alloc(int_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack int"
+        print *, mp%error_message
         stop 1
     end if
     ! we expect a single byte that contains the value 4
@@ -61,6 +62,7 @@ program packing
     call mp%pack_alloc(int_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack NFI"
+        print *, mp%error_message
         stop 1
     end if
     ! we expect a single byte that contains the value -27 (0b11100101 as int8)
@@ -86,6 +88,7 @@ program packing
     call mp%pack_alloc(str_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack Str8"
+        print *, mp%error_message
         stop 1
     end if
     length = len(small_text)
@@ -127,6 +130,7 @@ program packing
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixarray"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 22 bytes
@@ -154,6 +158,7 @@ program packing
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack array16"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 16387 bytes
@@ -192,6 +197,7 @@ program packing
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack array32"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 2^20 * 2 +_ 5 bytes
@@ -244,6 +250,7 @@ program packing
     call mp%pack_alloc(map_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixmap"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 21 bytes
@@ -272,6 +279,7 @@ program packing
     call mp%pack_alloc(map_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack map16"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 3 + 16 + 16 bytes
@@ -323,6 +331,7 @@ program packing
     call mp%pack_alloc(map_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack map32"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 5 + 65536 * 5 * 2 bytes
@@ -346,6 +355,7 @@ program packing
             call mp%unpack(buf(j:j + 4), mp_val)
             if (mp%failed()) then
                 print *, "[Error: failed to unpack map32 key at", i
+                print *, mp%error_message
                 stop 1
             end if
             call get_real(mp_val, rval, success)
@@ -361,6 +371,7 @@ program packing
             call mp%unpack(buf(j+5:j+9), mp_val)
             if (mp%failed()) then
                 print *, "[Error: failed to unpack map32 value at", i
+                print *, mp%error_message
             end if
             call get_real(mp_val, rval, success)
             if (.not. success) then
@@ -384,6 +395,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixext1"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 3 bytes
@@ -411,6 +423,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixext2"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 4 bytes
@@ -440,6 +453,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixext4"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 6 bytes
@@ -473,6 +487,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixext8"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 10 bytes
@@ -501,6 +516,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixext16"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 18 bytes
@@ -529,6 +545,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack ext8"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 18 bytes
@@ -557,6 +574,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack ext16"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 304 bytes
@@ -593,6 +611,7 @@ program packing
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack ext32"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 70006 bytes
@@ -628,6 +647,7 @@ program packing
     call mp%pack_alloc(ts_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack timestamp32"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 6 bytes
@@ -652,6 +672,7 @@ program packing
     call mp%pack_alloc(ts_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack timestamp64"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 10 bytes
@@ -687,6 +708,7 @@ program packing
     call mp%pack_alloc(ts_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack timestamp96"
+        print *, mp%error_message
         stop 1
     end if
     ! expect 15 bytes

@@ -31,6 +31,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream (PFI)"
+        print *, mp%error_message
         stop 1
     end if
     if (.not.(is_int(mpv))) then
@@ -52,6 +53,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream (NFI)"
+        print *, mp%error_message
         stop 1
     end if
     if (.not.(is_int(mpv))) then
@@ -77,6 +79,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(UInt32)"
+        print *, mp%error_message
         stop 1
     end if
     if (.not.(is_int(mpv))) then
@@ -108,6 +111,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(UInt64 big)"
+        print *, mp%error_message
         stop 1
     end if
     if (.not.(is_int(mpv))) then
@@ -136,6 +140,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixstr)"
+        print *, mp%error_message
         stop 1
     end if
     if (.not.(is_str(mpv))) then
@@ -165,6 +170,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixarr)"
+        print *, mp%error_message
         stop 1
     end if
     ! check length of the array
@@ -211,6 +217,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: unpacking stream(array16)"
+        print *, mp%error_message
         stop 1
     end if
     ! check length
@@ -258,6 +265,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: unpacking stream(array32)"
+        print *, mp%error_message
         stop 1
     end if
     ! check length
@@ -329,6 +337,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(fixmap)"
+        print *, mp%error_message
         stop 1
     end if
     if (mpv%numelements() /= 3) then
@@ -430,6 +439,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(map16)"
+        print *, mp%error_message
         stop 1
     end if
     if (mpv%numelements() /= 8192) then
@@ -490,6 +500,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(map32)"
+        print *, mp%error_message
         stop 1
     end if
     if (mpv%numelements() /= 262144) then
@@ -543,6 +554,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that binary was unpacked
@@ -574,6 +586,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that binary was unpacked
@@ -607,6 +620,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(bin)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that binary was unpacked
@@ -636,6 +650,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -675,6 +690,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -716,6 +732,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -752,6 +769,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -788,6 +806,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -825,6 +844,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -867,6 +887,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -913,6 +934,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking stream(ext)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that ext was unpacked
@@ -956,6 +978,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp32)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that timestamp was unpacked
@@ -993,6 +1016,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp64)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that timestamp was unpacked
@@ -1036,6 +1060,7 @@ program unpacking
     deallocate(stream)
     if (mp%failed()) then
         print *, "[Error: issue occurred with unpacking (timestamp96)"
+        print *, mp%error_message
         stop 1
     end if
     ! check that timestamp was unpacked

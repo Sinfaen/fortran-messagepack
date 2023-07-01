@@ -48,6 +48,7 @@ program roundtrip
     call mp%pack_alloc(mp_map, buffer)
     if (mp%failed()) then
         print *, "[Error: failed to pack map#1"
+        print *, mp%error_message
         stop 1
     end if
 
@@ -55,6 +56,7 @@ program roundtrip
     call mp%unpack(buffer, val)
     if (mp%failed()) then
         print *, "[Error: failed to unpack map#1"
+        print *, mp%error_message
         stop 1
     end if
     ! check equality
@@ -132,6 +134,7 @@ program roundtrip
     call mp%pack_alloc(mp_arr, buffer)
     if (mp%failed()) then
         print *, "[Error: failed to pack arr#1"
+        print *, mp%error_message
         stop 1
     end if
 
@@ -139,6 +142,7 @@ program roundtrip
     call mp%unpack(buffer, val)
     if (mp%failed()) then
         print *, "[Error: failed to unpack arr#1"
+        print *, mp%error_message
         stop 1
     end if
 
