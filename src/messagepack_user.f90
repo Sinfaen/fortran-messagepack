@@ -269,11 +269,11 @@ module messagepack_user
             if (byteadvance < size(buffer) .and. this%extra_bytes) then
                 ! configurable error
                 this%fail_flag = .true.
-                print *, "[Warning: Extra", size(buffer) - byteadvance, "bytes unused"
+                write(this%error_message, '(i0) (A)') size(buffer) - byteadvance, ' extra bytes unused'
             else if (byteadvance > size(buffer)) then
                 this%fail_flag = .true. ! bug within reporting byte mechanism
-                print *, "[Error: internal error byteadvance beyond buffer length"
-                print *, byteadvance, "=/=", size(buffer)
+                write(this%error_message, '(A) (i0)') "internal error. number of bytes exceeds buffer size by: ", &
+                    byteadvance - size(buffer)
             end if
         end subroutine
 

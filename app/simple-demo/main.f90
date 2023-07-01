@@ -28,7 +28,7 @@ program simple_demo
     mp_bin%value(1) = -2
     mp_bin%value(2) = 35
 
-    mp_map = mp_map_type(5_int64) ! pairs
+    mp_map = mp_map_type(6_int64) ! pairs
     mp_map%keys(1)%obj   = mp_str_type("rat")
     mp_map%values(1)%obj = mp_int_type(5)
     mp_map%keys(2)%obj   = mp_str_type("gerbil")
@@ -39,6 +39,8 @@ program simple_demo
     mp_map%values(4)%obj = mp_int_type(2)
     mp_map%keys(5)%obj   = mp_bool_type(.true.)
     mp_map%values(5)%obj = mp_arr
+    mp_map%keys(6)%obj   = mp_int_type(0)
+    mp_map%values(6)%obj = mp_int_type(-11)
 
     ! print the structure to the user
     print *, "MessagePack map object to be serialized"
