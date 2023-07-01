@@ -46,11 +46,11 @@ program packing
     ! we expect a single byte that contains the value 4
     if (size(buf) == 1) then
         if (buf(1) /= 4_int8) then
-            print *, "[Error: failed to pack NFI. byte(1): ", buf(1)
+            print *, "[Error: failed to pack PFI. byte(1): ", buf(1)
             stop 1
         end if
     else
-        print *, "[Error: failed to pack NFI. Size: ", size(buf)
+        print *, "[Error: failed to pack PFI. Size: ", size(buf)
         stop 1
     end if
     deallocate(buf)
@@ -67,7 +67,7 @@ program packing
     end if
     ! we expect a single byte that contains the value -27 (0b11100101 as int8)
     if (size(buf) == 1) then
-        if (buf(1) /= -27_int8) then
+        if (buf(1) /= -5_int8) then
             print *, "[Error: failed to pack NFI. byte(1): ", buf(1)
             stop 1
         end if
@@ -295,9 +295,9 @@ program packing
             stop 1
         end if
         do i = 1,16
-            if (buf(3 + 2*i - 1) /= -32 + i) then
+            if (buf(3 + 2*i - 1) /= -i) then
                 print *, "[Error: failed to pack map16 key at index", i
-                print *, "Found", buf(3+2*i-1), "Expected", -32 + i
+                print *, "Found", buf(3+2*i-1), "Expected", -i
                 stop 1
             end if
             if (modulo(i, 2) == 1) then ! false

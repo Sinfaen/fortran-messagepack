@@ -989,9 +989,8 @@ module messagepack_user
                 call this%unpack_map(val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_NFI_L:MP_NFI_H)
-                ! take the first 5 bits, create a negative value from it
-                btemp1 = ibits(buffer(1), 0, 5)
-                mpv = mp_int_type(-btemp1)
+                ! it's the straight bit pattern there
+                mpv = mp_int_type(buffer(1))
             end select
         end subroutine
 
