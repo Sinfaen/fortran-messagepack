@@ -487,8 +487,8 @@ module messagepack_value
             error = .false.
             if (this%value < 0) then
                 if (this%value >= -32) then
-                    ! negative fixint
-                    buf(1) = int(-32 - this%value, kind=int8)
+                    ! negative fixint - copy bits over
+                    buf(1) = int(this%value, kind=int8)
                 else if (this%value >= -128) then
                     ! int8
                     buf(1) = MP_I8

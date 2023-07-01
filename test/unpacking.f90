@@ -48,7 +48,7 @@ program unpacking
 
     ! negative fix int test: VALUE = -2
     allocate(stream(1))
-    stream(1) = -30 ! 0b11100010 as int8
+    stream(1) = -2
     call mp%unpack(stream, mpv)
     deallocate(stream)
     if (mp%failed()) then
@@ -162,7 +162,7 @@ program unpacking
     allocate(stream(6))
     stream(1) = ior(MP_FA_L, 3) ! fixarray byte mark
     stream(2) = 12  ! positive fix int
-    stream(3) = -29 ! negative fix int: 0b11100011 as int8
+    stream(3) = -3  ! negative fix int
     stream(4) = MP_I16 ! int 16 byte mark
     stream(5) = 125 ! 0x7d
     stream(6) = 0   ! 0x00
@@ -331,8 +331,8 @@ program unpacking
     stream(25) = 0  ! 0x00
     stream(26) = MP_T
     stream(27) = ior(MP_FA_L, 2) ! fixarr byte mark
-    stream(28) =   4 ! positive fix int
-    stream(29) = -30 ! 0b11100010 as int8
+    stream(28) =  4 ! positive fix int
+    stream(29) = -2 ! negative fix int
     call mp%unpack(stream, mpv)
     deallocate(stream)
     if (mp%failed()) then
@@ -429,7 +429,7 @@ program unpacking
     stream(3) = 0
     do i = 1,8192
         ! key
-        stream(4+4*(i-1)) = int(-32 + modulo(i, 11), kind=int8)
+        stream(4+4*(i-1)) = -int(modulo(i, 11), kind=int8)
         ! value
         stream(5+4*(i-1)) = MP_FE1
         stream(6+4*(i-1)) = 2
