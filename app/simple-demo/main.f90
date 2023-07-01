@@ -48,6 +48,7 @@ program simple_demo
     call mp%pack_alloc(mp_map, buffer)
     if (mp%failed()) then
         print *, "[Error: failed to pack mp_map"
+        print *, mp%error_message
         stop 1
     end if
     ! print the buffer

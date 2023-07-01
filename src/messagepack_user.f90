@@ -52,6 +52,7 @@ module messagepack_user
 
         logical :: is_little_endian
         logical :: fail_flag
+        character(:), allocatable :: error_message
         logical :: extra_bytes
     contains
         procedure :: register_extension
@@ -113,6 +114,7 @@ module messagepack_user
             ! AFAIK there is no stdlib equivalent of C++20 std::endian
             new_mp%is_little_endian = detect_little_endian()
             new_mp%fail_flag = .false.
+            new_mp%error_message = ''
             new_mp%extra_bytes = .true.
 
             ! add timestamp here
@@ -571,7 +573,7 @@ module messagepack_user
             ! need to have data available to read
             if (length == 0) then
                 successful = .false.
-                print *, "Buffer is empty"
+                this%error_message = 'buffer is empty'
                 return
             end if
 
@@ -579,6 +581,7 @@ module messagepack_user
             header_size = get_header_size_by_type(buffer(1))
             if (.not. check_length_and_print(header_size, length)) then
                 successful = .false.
+                this%error_message = 'buffer too small for header'
                 return
             end if
 
@@ -593,6 +596,7 @@ module messagepack_user
                 val_int64 = btemp1
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixmap - insufficient size for header'
                     return
                 end if
                 byteadvance = 1
@@ -603,6 +607,7 @@ module messagepack_user
                 call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixarray length
                 if (.not. check_length_and_print(1_int64 + btemp1, length)) then
                     successful = .false.
+                    this%error_message = 'fixarr - insufficient size for header'
                     return
                 end if
                 byteadvance = 1
@@ -613,6 +618,7 @@ module messagepack_user
                 call mvbits(buffer(1), 0, 5, btemp1, 0) ! get fixstr length
                 if (.not. check_length_and_print(1_int64 + btemp1, length)) then
                     successful = .false.
+                    this%error_message = 'fixstr - insufficient size for header'
                     return
                 end if
                 allocate(character(btemp1) :: val_char)
@@ -625,8 +631,8 @@ module messagepack_user
                 ! default is already nil
                 mpv = mp_nil_type()
             case (MP_NU)
-                print *, "Error, never used detected"
                 successful = .false.
+                this%error_message = 'Never Used detected. Invalid MsgPack'
             case (MP_F)
                 mpv = mp_bool_type(.false.)
             case (MP_T)
@@ -638,6 +644,7 @@ module messagepack_user
                 val_int64 = val_int32
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'bin8 - insufficient size'
                     return
                 end if
                 mpv = mp_bin_type(val_int64)
@@ -648,7 +655,7 @@ module messagepack_user
                     mpv%value(:) = buffer(3:2+val_int64)
                 class default
                     successful = .false.
-                    print *, "[Error: something went terribly wrong"
+                    this%error_message = 'internal error - bin8 cast'
                 end select
                 byteadvance = 2 + val_int64
             case (MP_B16)
@@ -657,6 +664,7 @@ module messagepack_user
                 val_int64 = int16_as_unsigned(val_int16)
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'bin16 - insufficient size'
                     return
                 end if
                 mpv = mp_bin_type(val_int64)
@@ -667,7 +675,7 @@ module messagepack_user
                     mpv%value(:) = buffer(4:3+val_int64)
                 class default
                     successful = .false.
-                    print *, "[Error: something went terribly wrong"
+                    this%error_message = 'internal error - bin16 bad cast'
                 end select
                 byteadvance = 3 + val_int64
             case (MP_B32)
@@ -676,6 +684,7 @@ module messagepack_user
                 val_int64 = int32_as_unsigned(val_int32)
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'bin32 - insufficient size'
                     return
                 end if
                 mpv = mp_bin_type(val_int64)
@@ -686,13 +695,14 @@ module messagepack_user
                     mpv%value(:) = buffer(6:5+val_int64)
                 class default
                     successful = .false.
-                    print *, "[Error: something went terribly wrong"
+                    this%error_message = 'internal error - bin32 bad cast'
                 end select
                 byteadvance = 5 + val_int64
             case (MP_E8)
                 ! check for first 3 bytes
                 if (.not. check_length_and_print(3_int64, length)) then
                     successful = .false.
+                    this%error_message = 'ext8 - insufficient size'
                     return
                 end if
                 i = buffer(3)
@@ -703,6 +713,7 @@ module messagepack_user
                 ! check for first 4 bytes
                 if (.not. check_length_and_print(4_int64, length)) then
                     successful = .false.
+                    this%error_message = 'ext16 - insufficient size'
                     return
                 end if
                 i = buffer(4)
@@ -714,6 +725,7 @@ module messagepack_user
                 ! check for first 6 bytes
                 if (.not. check_length_and_print(6_int64, length)) then
                     successful = .false.
+                    this%error_message = 'ext32 - insufficient size'
                     return
                 end if
                 i = buffer(6)
@@ -725,6 +737,7 @@ module messagepack_user
                 ! 4 bytes following
                 if (.not. check_length_and_print(5_int64, length)) then
                     successful = .false.
+                    this%error_message = 'float32 - insufficient size'
                     return
                 end if
                 mpv = new_real32(bytes_be_to_real_4(buffer(2:5), &
@@ -734,6 +747,7 @@ module messagepack_user
                 ! 8 bytes following
                 if (.not. check_length_and_print(9_int64, length)) then
                     successful = .false.
+                    this%error_message = 'float64 - insufficient size'
                     return
                 end if
                 mpv = new_real64(bytes_be_to_real_8(buffer(2:9), this%is_little_endian))
@@ -744,6 +758,7 @@ module messagepack_user
                 ! 1 byte following
                 if (.not. check_length_and_print(2_int64, length)) then
                     successful = .false.
+                    this%error_message = 'uint8 - insufficient size'
                     return
                 end if
                 mpv = mp_int_type(int8_as_unsigned(buffer(2)))
@@ -752,6 +767,7 @@ module messagepack_user
                 ! 2 bytes following
                 if (.not. check_length_and_print(3_int64, length)) then
                     successful = .false.
+                    this%error_message = 'uint16 - insufficient size'
                     return
                 end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
@@ -761,6 +777,7 @@ module messagepack_user
                 ! 4 bytes following
                 if (.not. check_length_and_print(5_int64, length)) then
                     successful = .false.
+                    this%error_message = 'uint32 - insufficient size'
                     return
                 end if
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
@@ -770,6 +787,7 @@ module messagepack_user
                 ! 8 bytes following
                 if (.not. check_length_and_print(9_int64, length)) then
                     successful = .false.
+                    this%error_message = 'uint64 - insufficient size'
                     return
                 end if
                 val_int64 = bytes_be_to_int_8(buffer(2:9), this%is_little_endian)
@@ -785,6 +803,7 @@ module messagepack_user
                 ! 1 byte following
                 if (.not. check_length_and_print(2_int64, length)) then
                     successful = .false.
+                    this%error_message = 'int8 - insufficient size'
                     return
                 end if
                 mpv = mp_int_type(buffer(2))
@@ -793,6 +812,7 @@ module messagepack_user
                 ! 2 bytes following
                 if (.not. check_length_and_print(3_int64, length)) then
                     successful = .false.
+                    this%error_message = 'int16 - insufficient size'
                     return
                 end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
@@ -803,6 +823,7 @@ module messagepack_user
                 ! 4 bytes following
                 if (.not. check_length_and_print(5_int64, length)) then
                     successful = .false.
+                    this%error_message = 'int32 - insufficient size'
                     return
                 end if
                 mpv = mp_int_type(bytes_be_to_int_4(buffer(2:5), this%is_little_endian))
@@ -811,6 +832,7 @@ module messagepack_user
                 ! 8 bytes following
                 if (.not. check_length_and_print(9_int64, length)) then
                     successful = .false.
+                    this%error_message = 'int64 - insufficient size'
                     return
                 end if
                 mpv = mp_int_type(bytes_be_to_int_8(buffer(2:9), this%is_little_endian))
@@ -820,6 +842,7 @@ module messagepack_user
                 ! 3 bytes following
                 if (.not. check_length_and_print(3_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixext1 - insufficient size'
                     return
                 end if
                 i = buffer(2)
@@ -830,6 +853,7 @@ module messagepack_user
                 ! 4 bytes following
                 if (.not. check_length_and_print(4_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixext2 - insufficient size'
                     return
                 end if
                 i = buffer(2)
@@ -840,6 +864,7 @@ module messagepack_user
                 ! 6 bytes following
                 if (.not. check_length_and_print(6_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixext4 - insufficient size'
                     return
                 end if
                 i = buffer(2)
@@ -850,6 +875,7 @@ module messagepack_user
                 ! 8 bytes following
                 if (.not. check_length_and_print(8_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixext8 - insufficient size'
                     return
                 end if
                 i = buffer(2)
@@ -860,6 +886,7 @@ module messagepack_user
                 ! 18 bytes following
                 if (.not. check_length_and_print(18_int64, length)) then
                     successful = .false.
+                    this%error_message = 'fixext16 - insufficient size'
                     return
                 end if
                 i = buffer(2)
@@ -871,6 +898,7 @@ module messagepack_user
                 val_int16 = int8_as_unsigned(buffer(2))
                 if (.not. check_length_and_print(2_int64 + val_int16, length)) then
                     successful = .false.
+                    this%error_message = 'str8 - insufficient size'
                     return
                 end if
                 ! create string
@@ -886,6 +914,7 @@ module messagepack_user
                 val_int32 = int16_as_unsigned(val_int16)
                 if (.not. check_length_and_print(3_int64 + val_int32, length)) then
                     successful = .false.
+                    this%error_message = 'str16 - insufficient size'
                     return
                 end if
                 ! create string
@@ -901,6 +930,7 @@ module messagepack_user
                 val_int64 = int32_as_unsigned(val_int32)
                 if (5 + val_int64 > length) then
                     successful = .false.
+                    this%error_message = 'str32 - insufficient size'
                     return
                 end if
                 ! create string
@@ -916,6 +946,7 @@ module messagepack_user
                 val_int32 = int16_as_unsigned(val_int16)
                 if (.not. check_length_and_print(1_int64 + val_int32, length)) then
                     successful = .false.
+                    this%error_message = 'arr16 - insufficient size'
                     return
                 end if
                 byteadvance = 3
@@ -927,6 +958,7 @@ module messagepack_user
                 val_int64 = int32_as_unsigned(val_int32)
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'arr32 - insufficient size'
                     return
                 end if
                 byteadvance = 5
@@ -938,6 +970,7 @@ module messagepack_user
                 val_int32 = int16_as_unsigned(val_int16)
                 if (.not. check_length_and_print(1_int64 + val_int32, length)) then
                     successful = .false.
+                    this%error_message = 'map16 - insufficient size'
                     return
                 end if
                 byteadvance = 3
@@ -949,6 +982,7 @@ module messagepack_user
                 val_int64 = int32_as_unsigned(val_int32)
                 if (.not. check_length_and_print(1 + val_int64, length)) then
                     successful = .false.
+                    this%error_message = 'map32 - insufficient size'
                     return
                 end if
                 byteadvance = 5
@@ -990,7 +1024,7 @@ module messagepack_user
                 class default
                     successful = .false.
                     deallocate(mpv)
-                    print *, "[Error: something went terribly wrong"
+                    this%error_message = 'internal error - unpack_array bad cast'
                 end select
             end do
         end subroutine
@@ -1025,7 +1059,7 @@ module messagepack_user
                 class default
                     successful = .false.
                     deallocate(mpv)
-                    print *, "[Error: something went terribly wrong"
+                    this%error_message = 'internal error - unpack_map bad cast'
                 end select
 
                 ! get value
@@ -1131,7 +1165,7 @@ module messagepack_user
             class default
                 successful = .false.
                 deallocate(mpv)
-                print *, "[Error: something went terribly wrong"
+                this%error_message = 'internal error - unpack_ext bad cast'
             end select
         end subroutine
 end module
