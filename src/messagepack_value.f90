@@ -118,6 +118,10 @@ module messagepack_value
         procedure :: getsize => get_size_float
         procedure :: pack => pack_float
     end type
+    interface mp_float_type
+        procedure :: new_real32
+        procedure :: new_real64
+    end interface
 
     type, extends(mp_value_type) :: mp_str_type
         character(:), allocatable :: value
@@ -130,7 +134,7 @@ module messagepack_value
     end interface mp_str_type
 
     type, extends(mp_value_type) :: mp_bin_type
-        byte, allocatable, dimension(:) :: value
+        byte, allocatable, dimension(:) :: values
     contains
         procedure :: getsize => get_size_bin
         procedure :: numelements => get_bin_size
@@ -138,10 +142,11 @@ module messagepack_value
     end type
     interface mp_bin_type
         procedure :: new_bin
+        procedure :: new_bin_64
     end interface mp_bin_type
 
     type, extends(mp_value_type) :: mp_arr_type
-        class(mp_value_type_ptr), allocatable, dimension(:) :: value
+        class(mp_value_type_ptr), allocatable, dimension(:) :: values
     contains
         procedure :: getsize => get_size_arr
         procedure :: numelements => get_arr_size
@@ -149,6 +154,7 @@ module messagepack_value
     end type
     interface mp_arr_type
         procedure :: new_arr
+        procedure :: new_arr_64
     end interface mp_arr_type
 
     type, extends(mp_value_type) :: mp_map_type
@@ -162,6 +168,7 @@ module messagepack_value
     end type
     interface mp_map_type
         procedure :: new_map
+        procedure :: new_map_64
     end interface mp_map_type
 
     type, extends(mp_value_type) :: mp_ext_type
@@ -351,7 +358,7 @@ module messagepack_value
             class(mp_bin_type)   :: this
             integer(kind=int64), intent(out) :: osize
             integer :: length
-            length = size(this%value)
+            length = size(this%values)
             if (length <= 255) then
                 osize = length + 2 ! bin8
             else if (length <= 65535) then
@@ -367,7 +374,7 @@ module messagepack_value
             integer(kind=int64), intent(out) :: osize
             integer(kind=int64) i, elemsize, length
 
-            length = size(this%value)
+            length = size(this%values)
             ! set initial value
             if (length <= 15) then
                 osize = 1 ! fixarray
@@ -380,7 +387,7 @@ module messagepack_value
 
             ! get sizes of all contained values
             do i = 1, length
-                call this%value(i)%obj%getsize(elemsize)
+                call this%values(i)%obj%getsize(elemsize)
                 osize = osize + elemsize
             end do
         end subroutine
@@ -638,7 +645,7 @@ module messagepack_value
                 error = .true.
                 return
             end select
-            buf(writeindex:writeindex+length-1) = this%value
+            buf(writeindex:writeindex+length-1) = this%values
 
             error = .false.
         end subroutine
@@ -678,8 +685,8 @@ module messagepack_value
                 return
             end select
             do i = 1,length
-                call this%value(i)%obj%pack(buf(writeindex:), error)
-                call this%value(i)%obj%getsize(length)
+                call this%values(i)%obj%pack(buf(writeindex:), error)
+                call this%values(i)%obj%getsize(length)
                 writeindex = writeindex + length
                 if (error) then
                     return
@@ -953,23 +960,39 @@ module messagepack_value
         end function new_str
 
         type(mp_bin_type) function new_bin(length)
-            integer(kind=int64), intent(in) :: length ! number of elements to allocate
+            integer, intent(in) :: length ! number of elements to allocate
             if (length > 2147483647_int64) then
                 print *, "[Warning: Allocated array with size greater than packing allows"
             end if
-            allocate(new_bin%value(length))
+            allocate(new_bin%values(length))
         end function new_bin
 
-        type(mp_arr_type) function new_arr(length)
+        type(mp_bin_type) function new_bin_64(length)
             integer(kind=int64), intent(in) :: length ! number of elements to allocate
             if (length > 2147483647_int64) then
                 print *, "[Warning: Allocated array with size greater than packing allows"
             end if
-            allocate(new_arr%value(length))
+            allocate(new_bin_64%values(length))
+        end function new_bin_64
+
+        type(mp_arr_type) function new_arr(length)
+            integer, intent(in) :: length ! number of elements to allocate
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated array with size greater than packing allows"
+            end if
+            allocate(new_arr%values(length))
         end function new_arr
 
-        type(mp_map_type) function new_map(length)
+        type(mp_arr_type) function new_arr_64(length)
             integer(kind=int64), intent(in) :: length ! number of elements to allocate
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated array with size greater than packing allows"
+            end if
+            allocate(new_arr_64%values(length))
+        end function new_arr_64
+
+        type(mp_map_type) function new_map(length)
+            integer, intent(in) :: length ! number of elements to allocate
 
             if (length > 2147483647_int64) then
                 print *, "[Warning: Allocated map with size greater than packing allows"
@@ -978,6 +1001,17 @@ module messagepack_value
             allocate(new_map%values(length))
             new_map%ne = length
         end function new_map
+
+        type(mp_map_type) function new_map_64(length)
+            integer(kind=int64), intent(in) :: length ! number of elements to allocate
+
+            if (length > 2147483647_int64) then
+                print *, "[Warning: Allocated map with size greater than packing allows"
+            end if
+            allocate(new_map_64%keys(length))
+            allocate(new_map_64%values(length))
+            new_map_64%ne = length
+        end function new_map_64
 
         type(mp_ext_type) function new_ext(etype, length)
             integer, intent(in) :: etype
@@ -1067,7 +1101,7 @@ module messagepack_value
             select type(obj)
             type is (mp_value_type)
             class is (mp_bin_type)
-                val = obj%value
+                val = obj%values
                 stat = .true.
             class default
                 stat = .false.
@@ -1121,12 +1155,12 @@ module messagepack_value
 
         integer(kind=int64) function get_bin_size(obj)
             class(mp_bin_type) :: obj
-            get_bin_size = size(obj%value)
+            get_bin_size = size(obj%values)
         end function
 
         integer(kind=int64) function get_arr_size(obj)
             class(mp_arr_type) :: obj
-            get_arr_size = size(obj%value)
+            get_arr_size = size(obj%values)
         end function
 
         integer(kind=int64) function get_map_size(obj)

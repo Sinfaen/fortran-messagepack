@@ -62,7 +62,7 @@ contains
         l = arr%numelements()
         allocate(om(l))
         do i = 1,l
-            call get_int(arr%value(i)%obj, val, stat)
+            call get_int(arr%values(i)%obj, val, stat)
             if (.not.(stat)) then
                 return
             end if
@@ -95,7 +95,7 @@ contains
         l = arr%numelements()
         allocate(om(l))
         do i = 1,l
-            call get_real(arr%value(i)%obj, val, stat)
+            call get_real(arr%values(i)%obj, val, stat)
             if (.not.(stat)) then
                 return
             end if

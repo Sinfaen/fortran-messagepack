@@ -188,11 +188,11 @@ program unpacking
 
     ! loop over all elements
     do i = 1,3
-        if (.not. is_int(arrtmp%value(i)%obj)) then
+        if (.not. is_int(arrtmp%values(i)%obj)) then
             print *, "[Error: fixarray[", i, "] is not an int"
             stop 1
         end if
-        call get_int(arrtmp%value(i)%obj, itmp, status)
+        call get_int(arrtmp%values(i)%obj, itmp, status)
         if (itmp /= i_a_3(i)) then
             print *, "[Error: unpacked ", itmp, "instead of", i_a_3(i), "for fixarray > ", i
         end if
@@ -233,7 +233,7 @@ program unpacking
     end if
     ! check elements
     do i = 1,16
-        call get_bool(arrtmp%value(i)%obj, btmp, status)
+        call get_bool(arrtmp%values(i)%obj, btmp, status)
         if (.not.(status)) then
             print *, "[Error: array16", i, "is not a boolean"
             stop 1
@@ -243,7 +243,7 @@ program unpacking
             stop 1
         end if
     end do
-    if (.not.(is_nil(arrtmp%value(17)%obj))) then
+    if (.not.(is_nil(arrtmp%values(17)%obj))) then
         print *, "[Error: array16(17) is not nil"
         stop 1
     end if
@@ -281,7 +281,7 @@ program unpacking
     end if
     ! check elements
     do i = 1,1048576
-        call get_bin(arrtmp%value(i)%obj, byte_tmp, status)
+        call get_bin(arrtmp%values(i)%obj, byte_tmp, status)
         if (.not.(status)) then
             print *, "[Error: unpacked array32", i, "is not a bin"
             stop 1
@@ -406,11 +406,11 @@ program unpacking
     call get_arr_ref(maptmp%values(3)%obj, arrtmp, status)
     i_a_2 = (/4, -2/)
     do i = 1,2
-        if (.not. is_int(arrtmp%value(i)%obj)) then
+        if (.not. is_int(arrtmp%values(i)%obj)) then
             print *, "[Error: fixmap[3] value[", i, "] is not an int"
             stop 1
         end if
-        call get_int(arrtmp%value(i)%obj, itmp, status)
+        call get_int(arrtmp%values(i)%obj, itmp, status)
         if (itmp /= i_a_2(i)) then
             print *, "[Error: fixmap[3] value[", i, "] was not ", i_a_2(i)
             stop 1

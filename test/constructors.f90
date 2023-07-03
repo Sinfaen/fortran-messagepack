@@ -19,19 +19,19 @@ program constructors
     nil_test  = mp_nil_type()
     bool_test = mp_bool_type(.true.)
     int_test  = mp_int_type(45)
-    float_test = new_real32(-23.1)
+    float_test = mp_float_type(-23.1)
     str_test = mp_str_type("hello world")
 
     ! array contructor test
-    arr_test = mp_arr_type(5_int64)
-    arr_test%value(1)%obj = mp_nil_type()
-    arr_test%value(2)%obj = mp_bool_type(.true.)
-    arr_test%value(3)%obj = mp_int_type(45)
-    arr_test%value(4)%obj = new_real32(-51.4)
-    arr_test%value(5)%obj = mp_arr_type(2_int64)
+    arr_test = mp_arr_type(5)
+    arr_test%values(1)%obj = mp_nil_type()
+    arr_test%values(2)%obj = mp_bool_type(.true.)
+    arr_test%values(3)%obj = mp_int_type(45)
+    arr_test%values(4)%obj = new_real32(-51.4)
+    arr_test%values(5)%obj = mp_arr_type(2)
 
     ! map constructor test
-    map_test = mp_map_type(4_int64)
+    map_test = mp_map_type(4)
     map_test%keys(1)%obj   = mp_int_type(34)
     map_test%values(1)%obj = mp_str_type("tokay gecko")
     map_test%keys(2)%obj   = mp_int_type(10)
@@ -42,10 +42,10 @@ program constructors
     map_test%values(4)%obj = mp_nil_type()
 
     ! binary constructor test
-    bin_test = mp_bin_type(3_int64)
-    bin_test%value(1) = 3
-    bin_test%value(2) = -2
-    bin_test%value(3) = 4
+    bin_test = mp_bin_type(3)
+    bin_test%values(1) = 3
+    bin_test%values(2) = -2
+    bin_test%values(3) = 4
 
     ! extension constructor test
     ext_test = mp_ext_type(40, 7_int64)
