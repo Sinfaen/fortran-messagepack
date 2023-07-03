@@ -336,7 +336,7 @@ module messagepack_user
             class is (mp_arr_type)
                 write(*, "(A)", advance="no") "["
                 printarr : do j = 1,obj%numelements()
-                    call this%print_value_with_args(obj%value(j)%obj, 0, .true., maxelems)
+                    call this%print_value_with_args(obj%values(j)%obj, 0, .true., maxelems)
                     write(*, "(A)", advance="no") ", "
                     if (maxelems > 0 .and. j > maxelems) then
                         write(*, "(A3)") "..."
@@ -370,7 +370,7 @@ module messagepack_user
             class is (mp_bin_type)
                 write(*, "(A)", advance="no") "BIN["
                 printbin : do j = 1,obj%numelements()
-                    write(*, "(I0, A)", advance="no") obj%value(j), ", "
+                    write(*, "(I0, A)", advance="no") obj%values(j), ", "
                     if (maxelems > 0 .and. j > maxelems) then
                         write(*, "(A)") "..."
                         exit printbin
@@ -652,7 +652,7 @@ module messagepack_user
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(3:2+val_int64)
+                    mpv%values(:) = buffer(3:2+val_int64)
                 class default
                     successful = .false.
                     this%error_message = 'internal error - bin8 cast'
@@ -672,7 +672,7 @@ module messagepack_user
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(4:3+val_int64)
+                    mpv%values(:) = buffer(4:3+val_int64)
                 class default
                     successful = .false.
                     this%error_message = 'internal error - bin16 bad cast'
@@ -692,7 +692,7 @@ module messagepack_user
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_bin_type)
-                    mpv%value(:) = buffer(6:5+val_int64)
+                    mpv%values(:) = buffer(6:5+val_int64)
                 class default
                     successful = .false.
                     this%error_message = 'internal error - bin32 bad cast'
@@ -1019,7 +1019,7 @@ module messagepack_user
                 select type (mpv)
                 type is (mp_value_type)
                 class is (mp_arr_type)
-                    mpv%value(i)%obj = val_any
+                    mpv%values(i)%obj = val_any
                 class default
                     successful = .false.
                     deallocate(mpv)

@@ -20,13 +20,13 @@ program simple_demo
 
     ! complicated example
     mp_arr = mp_arr_type(3_int64)
-    mp_arr%value(1)%obj = new_real32(5.01)
-    mp_arr%value(2)%obj = new_real32(-21.2)
-    mp_arr%value(3)%obj = new_real32(700.0)
+    mp_arr%values(1)%obj = mp_float_type(5.01)
+    mp_arr%values(2)%obj = mp_float_type(-21.2)
+    mp_arr%values(3)%obj = mp_float_type(700.0)
 
     mp_bin = mp_bin_type(2_int64)
-    mp_bin%value(1) = -2
-    mp_bin%value(2) = 35
+    mp_bin%values(1) = -2
+    mp_bin%values(2) = 35
 
     mp_map = mp_map_type(6_int64) ! pairs
     mp_map%keys(1)%obj   = mp_str_type("rat")

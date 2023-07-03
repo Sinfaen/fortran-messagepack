@@ -20,7 +20,6 @@ program packing
     integer :: i
     integer :: j
     integer :: length
-    logical :: errored
     logical :: success
     real(kind=real64) :: rval
 
@@ -122,11 +121,11 @@ program packing
     print *, "[Info: Str8 packing test succeeded"
 
     ! fixarray test
-    arr_test = mp_arr_type(4_int64)
-    arr_test%value(1)%obj = new_real32(32.1)
-    arr_test%value(2)%obj = new_real64(-2.03_8)
-    arr_test%value(3)%obj = mp_str_type("mochi")
-    arr_test%value(4)%obj = mp_bool_type(.true.)
+    arr_test = mp_arr_type(4)
+    arr_test%values(1)%obj = mp_float_type(32.1)
+    arr_test%values(2)%obj = mp_float_type(-2.03_8)
+    arr_test%values(3)%obj = mp_str_type("mochi")
+    arr_test%values(4)%obj = mp_bool_type(.true.)
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
         print *, "[Error: failed to pack fixarray"
@@ -151,9 +150,9 @@ program packing
     ! array16 test
     ! 2^14 elements: all PFI values within [3,123]
     ! - use PFI so that the binary checking is easy
-    arr_test = mp_arr_type(16384_int64)
+    arr_test = mp_arr_type(16384)
     do i = 1,16384
-        arr_test%value(i)%obj = mp_int_type(modulo(i, 120) + 3)
+        arr_test%values(i)%obj = mp_int_type(modulo(i, 120) + 3)
     end do
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
@@ -192,7 +191,7 @@ program packing
     ! all uint8 elements [200:255]. allows easy binary checking
     arr_test = mp_arr_type(1048576_int64)
     do i = 1,1048576
-        arr_test%value(i)%obj = mp_int_type(199 + modulo(i, 57))
+        arr_test%values(i)%obj = mp_int_type(199 + modulo(i, 57))
     end do
     call mp%pack_alloc(arr_test, buf)
     if (mp%failed()) then
@@ -237,13 +236,13 @@ program packing
     print *, "[Info: array32 packing test succeeded"
 
     ! fixmap test
-    arr_test = mp_arr_type(1_int64)
-    arr_test%value(1)%obj = mp_str_type("a")
+    arr_test = mp_arr_type(1)
+    arr_test%values(1)%obj = mp_str_type("a")
 
-    map_test = mp_map_type(3_int64)
-    map_test%keys(1)%obj   = new_real32(21.1)
+    map_test = mp_map_type(3)
+    map_test%keys(1)%obj   = mp_float_type(21.1)
     map_test%values(1)%obj = mp_bool_type(.false.)
-    map_test%keys(2)%obj   = new_real64(74.1_real64)
+    map_test%keys(2)%obj   = mp_float_type(74.1_real64)
     map_test%values(2)%obj = mp_nil_type()
     map_test%keys(3)%obj   = mp_int_type(3)
     map_test%values(3)%obj = arr_test
@@ -271,7 +270,7 @@ program packing
     ! map16 test
     ! keys = NFI -1:-16
     ! values = [.false., .true., ...]
-    map_test = mp_map_type(16_int64)
+    map_test = mp_map_type(16)
     do i = 1,16
         map_test%keys(i)%obj = mp_int_type(-i)
         map_test%values(i)%obj = mp_bool_type(modulo(i, 2) == 0)
@@ -325,8 +324,8 @@ program packing
     ! values = real32 ( log(1:65536) )
     map_test = mp_map_type(65536_int64)
     do i = 1,65536
-        map_test%keys(i)%obj   = new_real32(i + 0.0)
-        map_test%values(i)%obj = new_real32(log(i + 0.0))
+        map_test%keys(i)%obj   = mp_float_type(i + 0.0)
+        map_test%values(i)%obj = mp_float_type(log(i + 0.0))
     end do
     call mp%pack_alloc(map_test, buf)
     if (mp%failed()) then
@@ -511,7 +510,7 @@ program packing
     ! fixext16 test
     ext_test = mp_ext_type(-128, 16_int64)
     do i=1,16
-        ext_test%values(i) = i*i - 10*i
+        ext_test%values(i) = int(i*i - 10*i, kind=int8)
     end do
     call mp%pack_alloc(ext_test, buf)
     if (mp%failed()) then

@@ -32,11 +32,11 @@ program roundtrip
     mp = msgpack()
 
     ! map test 1
-    mp_arr = mp_arr_type(2_int64)
-    mp_arr%value(1)%obj = new_real32(3.4)
-    mp_arr%value(2)%obj = new_real32(7.5)
+    mp_arr = mp_arr_type(2)
+    mp_arr%values(1)%obj = new_real32(3.4)
+    mp_arr%values(2)%obj = new_real32(7.5)
 
-    mp_map = mp_map_type(3_int64)
+    mp_map = mp_map_type(3)
     mp_map%keys(1)%obj = mp_int_type(4)
     mp_map%values(1)%obj = mp_str_type("hello world")
     mp_map%keys(2)%obj = mp_int_type(11)
@@ -111,24 +111,24 @@ program roundtrip
     print *, "[Info: map roundtrip test #1 succeeded"
 
     ! array test 1
-    mp_arr = mp_arr_type(9_int64)
-    mp_bin = mp_bin_type(300_int64)
+    mp_arr = mp_arr_type(9)
+    mp_bin = mp_bin_type(300)
     do i = 1,300
-        mp_bin%value(i) = int(modulo(i, 55), kind=int8)
+        mp_bin%values(i) = int(modulo(i, 55), kind=int8)
     end do
     mp_ext = mp_ext_type(25, 70000_int64)
     do i = 1,70000
         mp_ext%values(i) = int(modulo(i, 73), kind=int8)
     end do
-    mp_arr%value(1)%obj = mp_str_type("foo")
-    mp_arr%value(2)%obj = mp_nil_type()
-    mp_arr%value(3)%obj = mp_timestamp_type(10, 300)
-    mp_arr%value(4)%obj = mp_bin
-    mp_arr%value(5)%obj = mp_bool_type(.false.)
-    mp_arr%value(6)%obj = mp_ext
-    mp_arr%value(7)%obj = mp_int_type(-2000000000_int64)
-    mp_arr%value(8)%obj = new_real64(3.1415926535_real64)
-    mp_arr%value(9)%obj = mp_bool_type(.true.)
+    mp_arr%values(1)%obj = mp_str_type("foo")
+    mp_arr%values(2)%obj = mp_nil_type()
+    mp_arr%values(3)%obj = mp_timestamp_type(10, 300)
+    mp_arr%values(4)%obj = mp_bin
+    mp_arr%values(5)%obj = mp_bool_type(.false.)
+    mp_arr%values(6)%obj = mp_ext
+    mp_arr%values(7)%obj = mp_int_type(-2000000000_int64)
+    mp_arr%values(8)%obj = new_real64(3.1415926535_real64)
+    mp_arr%values(9)%obj = mp_bool_type(.true.)
 
     ! serialize
     call mp%pack_alloc(mp_arr, buffer)
@@ -156,21 +156,21 @@ program roundtrip
         print *, "[Error: incorrect array size"
         stop 1
     end if
-    call get_str(arr_temp%value(1)%obj, str_temp, error)
+    call get_str(arr_temp%values(1)%obj, str_temp, error)
     if (.not.(error) .or. str_temp /= "foo") then
         print *, "[Error: arr 1"
         stop 1
     end if
-    if (.not.(is_nil(arr_temp%value(2)%obj))) then
+    if (.not.(is_nil(arr_temp%values(2)%obj))) then
         print *, "[Error: arr 2"
         stop 1
     end if
-    call get_timestamp_ref(arr_temp%value(3)%obj, mp_ts, error)
+    call get_timestamp_ref(arr_temp%values(3)%obj, mp_ts, error)
     if (.not.(error) .or. mp_ts%seconds /= 10 .or. mp_ts%nanoseconds /= 300) then
         print *, "[Error: arr 3"
         stop 1
     end if
-    call get_bin(arr_temp%value(4)%obj, byte_temp, error)
+    call get_bin(arr_temp%values(4)%obj, byte_temp, error)
     if (error) then
         if (size(byte_temp) == 300) then
             do i = 1,300
@@ -187,12 +187,12 @@ program roundtrip
         print *, "[Error: arr 4 not a bin"
         stop 1
     end if
-    call get_bool(arr_temp%value(5)%obj, b_temp, error)
+    call get_bool(arr_temp%values(5)%obj, b_temp, error)
     if (.not.(error) .or. b_temp .neqv. .false.) then
         print *, "[Error: arr 5"
         stop 1
     end if
-    call get_ext_ref(arr_temp%value(6)%obj, ext_temp, error)
+    call get_ext_ref(arr_temp%values(6)%obj, ext_temp, error)
     if (error .and. ext_temp%numelements() == 70000) then
         do i = 1,70000
             if (ext_temp%values(i) /= modulo(i, 73)) then
@@ -204,17 +204,17 @@ program roundtrip
         print *, "[Error: arr 6 ext inv"
         stop 1
     end if
-    call get_int(arr_temp%value(7)%obj, i_temp, error)
+    call get_int(arr_temp%values(7)%obj, i_temp, error)
     if (.not.(error) .or. i_temp /= -2000000000_int64) then
         print *, "[Error: arr 7"
         stop 1
     end if
-    call get_real(arr_temp%value(8)%obj, r_temp, error)
+    call get_real(arr_temp%values(8)%obj, r_temp, error)
     if (.not.(error) .or. r_temp /= 3.1415926535_real64) then
         print *, "[Error: arr 8"
         stop 1
     end if
-    call get_bool(arr_temp%value(9)%obj, b_temp, error)
+    call get_bool(arr_temp%values(9)%obj, b_temp, error)
     if (.not.(error) .or. b_temp .neqv. .true.) then
         print *, "[Error: arr 9"
         stop 1
