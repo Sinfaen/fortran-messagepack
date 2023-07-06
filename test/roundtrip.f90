@@ -127,7 +127,7 @@ program roundtrip
     mp_arr%values(5)%obj = mp_bool_type(.false.)
     mp_arr%values(6)%obj = mp_ext
     mp_arr%values(7)%obj = mp_int_type(-2000000000_int64)
-    mp_arr%values(8)%obj = new_real64(3.1415926535_real64)
+    mp_arr%values(8)%obj = mp_float_type(3.1415926535_real64)
     mp_arr%values(9)%obj = mp_bool_type(.true.)
 
     ! serialize

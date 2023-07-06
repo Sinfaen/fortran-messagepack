@@ -62,7 +62,7 @@ module messagepack_value
     public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref, get_ext_ref
     public :: get_header_size_by_type
 
-    type :: mp_value_type
+    type, abstract :: mp_value_type
         ! nothing here
     contains
         procedure :: getsize => get_size_1
@@ -796,7 +796,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_nil_type)
                 res = .true.
             class default
@@ -809,7 +808,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_bool_type)
                 res = .true.
             class default
@@ -822,7 +820,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_int_type)
                 res = .true.
             class default
@@ -835,7 +832,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_float_type)
                 res = .true.
             class default
@@ -848,7 +844,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_str_type)
                 res = .true.
             class default
@@ -861,7 +856,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_bin_type)
                 res = .true.
             class default
@@ -874,7 +868,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_arr_type)
                 res = .true.
             class default
@@ -887,7 +880,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_map_type)
                 res = .true.
             class default
@@ -900,7 +892,6 @@ module messagepack_value
             logical :: res
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_ext_type)
                 res = .true.
             class default
@@ -923,7 +914,6 @@ module messagepack_value
             ! Changes the unsigned_64 flag to true for packing purposes
             class(mp_value_type), intent(inout) :: obj
             select type (obj)
-            type is (mp_value_type)
             class is (mp_int_type)
                 obj%unsigned_64 = .true.
             end select
@@ -932,7 +922,6 @@ module messagepack_value
         logical function is_unsigned(obj)
             class(mp_value_type), intent(in) :: obj
             select type (obj)
-            type is (mp_value_type)
             class is (mp_int_type)
                 is_unsigned = obj%unsigned_64
             class default
@@ -1031,7 +1020,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type(obj)
-            type is (mp_value_type)
             class is (mp_bool_type)
                 val = obj%value
                 stat = .true.
@@ -1047,7 +1035,6 @@ module messagepack_value
             logical, intent(out) :: stat
             ! emulate is_int
             select type (obj)
-            type is (mp_value_type)
             class is (mp_int_type)
                 val = obj%value
                 stat = .true.
@@ -1063,7 +1050,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_float_type)
                 if (obj%is_64) then
                     val = obj%f64value
@@ -1083,7 +1069,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type (obj)
-            type is (mp_value_type)
             class is (mp_str_type)
                 val = obj%value
                 stat = .true.
@@ -1099,7 +1084,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type(obj)
-            type is (mp_value_type)
             class is (mp_bin_type)
                 val = obj%values
                 stat = .true.
@@ -1114,7 +1098,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type(obj)
-            type is(mp_value_type)
             class is (mp_arr_type)
                 val = obj
                 stat = .true.
@@ -1129,7 +1112,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type(obj)
-            type is(mp_value_type)
             class is (mp_map_type)
                 val = obj
                 stat = .true.
@@ -1144,7 +1126,6 @@ module messagepack_value
             logical, intent(out) :: stat
 
             select type(obj)
-            type is (mp_value_type)
             class is (mp_ext_type)
                 val = obj
                 stat = .true.
