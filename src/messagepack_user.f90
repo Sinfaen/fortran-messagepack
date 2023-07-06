@@ -309,7 +309,6 @@ module messagepack_user
             end if
     
             select type(obj)
-            type is (mp_value_type)
             class is (mp_nil_type)
                 write(*, "(A)", advance="no") "nil"
             class is (mp_bool_type)
@@ -521,7 +520,6 @@ module messagepack_user
             logical :: res
 
             select type(obj)
-            type is(mp_value_type)
             class is (mp_timestamp_type)
                 res = .true.
             class default
@@ -535,7 +533,6 @@ module messagepack_user
             logical, intent(out) :: stat
 
             select type(obj)
-            type is (mp_value_type)
             class is (mp_timestamp_type)
                 val = obj
                 stat = .true.
@@ -650,7 +647,6 @@ module messagepack_user
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_bin_type)
                     mpv%values(:) = buffer(3:2+val_int64)
                 class default
@@ -670,7 +666,6 @@ module messagepack_user
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_bin_type)
                     mpv%values(:) = buffer(4:3+val_int64)
                 class default
@@ -690,7 +685,6 @@ module messagepack_user
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_bin_type)
                     mpv%values(:) = buffer(6:5+val_int64)
                 class default
@@ -1017,7 +1011,6 @@ module messagepack_user
 
                 ! store the newly unpacked object into the array
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_arr_type)
                     mpv%values(i)%obj = val_any
                 class default
@@ -1052,7 +1045,6 @@ module messagepack_user
                     return
                 end if
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_map_type)
                     mpv%keys(i)%obj = val_any
                 class default
@@ -1070,7 +1062,6 @@ module messagepack_user
                     return
                 end if
                 select type (mpv)
-                type is (mp_value_type)
                 class is (mp_map_type)
                     mpv%values(i)%obj = val_any
                 class default
@@ -1157,7 +1148,6 @@ module messagepack_user
             mpv = mp_ext_type(etype, length)
             successful = .true.
             select type(mpv)
-            type is (mp_value_type)
             class is (mp_ext_type)
                 mpv%values = buffer(byteadvance+1:byteadvance+length)
                 byteadvance = byteadvance + length
