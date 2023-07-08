@@ -231,24 +231,32 @@ module messagepack_user
             class(msgpack) :: this
             class(mp_value_type) :: mpv
             byte, allocatable, dimension(:), intent(out) :: buffer
-            integer(kind=int64) dblen
+            integer(kind=int64) :: dblen
+            integer(kind=int64) :: numused
 
             call mpv%getsize(dblen) ! get buffer size required
             allocate(buffer(dblen)) ! allocate buffer
 
-            call mpv%pack(buffer, this%fail_flag)
+            call mpv%pack(buffer, numused, this%fail_flag)
+            if (.not.(this%fail_flag)) then
+                if (dblen /= numused) then
+                    this%fail_flag = .true.
+                    this%error_message = 'Internal Error: packing failed'
+                end if
+            end if
         end subroutine
 
-        subroutine pack_prealloc(this, mpv, buffer)
+        subroutine pack_prealloc(this, mpv, bytes_used, buffer)
             ! Packs a messagepack object into a pre-allocated buffer,
             ! returned to the user. This function does not check beforehand
             ! for the array being the correct size, and will return an error
             ! if the buffer is too small.
             class(msgpack) :: this
             class(mp_value_type) :: mpv
+            integer(kind=int64), intent(out) :: bytes_used
             byte, allocatable, dimension(:), intent(inout) :: buffer
 
-            call mpv%pack(buffer, this%fail_flag)
+            call mpv%pack(buffer, bytes_used, this%fail_flag)
         end subroutine
 
         subroutine unpack(this, buffer, mpv)
@@ -409,20 +417,20 @@ module messagepack_user
             end if
         end subroutine
 
-        subroutine pack_timestamp(this, buf, error)
+        subroutine pack_timestamp(this, buf, num, error)
             class(mp_timestamp_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             integer(kind=int64) :: temp
-            integer(kind=int64) :: replength
-            call this%getsize(replength)
-            if (replength > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
 
-            select case (replength)
+            select case (num)
             case (6)  ! timestamp32
                 buf(1) = MP_FE4
                 buf(2) = MP_TS_EXT

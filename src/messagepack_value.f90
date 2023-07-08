@@ -440,17 +440,19 @@ module messagepack_value
             end if
         end subroutine
 
-        subroutine pack_value(this, buf, error)
+        subroutine pack_value(this, buf, num, error)
             class(mp_value_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
             print *, "[Error: abstract pack function called"
             error = .true. ! this function should never be called
         end subroutine
 
-        subroutine pack_nil(this, buf, error)
+        subroutine pack_nil(this, buf, num, error)
             class(mp_nil_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             if (size(buf) < 1) then
@@ -459,12 +461,14 @@ module messagepack_value
             end if
 
             buf(1) = MP_NIL
-            error = .false.
+            num    = 1
+            error  = .false.
         end subroutine
 
-        subroutine pack_bool(this, buf, error)
+        subroutine pack_bool(this, buf, num, error)
             class(mp_bool_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             if (size(buf) < 1) then
@@ -478,16 +482,17 @@ module messagepack_value
                 buf(1) = MP_F
             end if
             error = .false.
+            num   = 1
         end subroutine
 
-        subroutine pack_int(this, buf, error)
+        subroutine pack_int(this, buf, num, error)
             class(mp_int_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
-            integer(kind=int64) :: replength
-            call this%getsize(replength)
-            if (replength > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -546,15 +551,15 @@ module messagepack_value
             end if
         end subroutine
 
-        subroutine pack_float(this, buf, error)
+        subroutine pack_float(this, buf, num, error)
             class(mp_float_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
-            integer(kind=int64) :: length
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -571,9 +576,10 @@ module messagepack_value
             error = .false.
         end subroutine
 
-        subroutine pack_str(this, buf, error)
+        subroutine pack_str(this, buf, num, error)
             class(mp_str_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
@@ -581,8 +587,8 @@ module messagepack_value
             integer :: strtype
             integer :: writeindex
             integer(kind=int64) :: i
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -611,17 +617,18 @@ module messagepack_value
             error = .false.
         end subroutine
 
-        subroutine pack_bin(this, buf, error)
+        subroutine pack_bin(this, buf, num, error)
             class(mp_bin_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
             integer :: writeindex
             integer :: bintype
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -650,18 +657,19 @@ module messagepack_value
             error = .false.
         end subroutine
 
-        recursive subroutine pack_arr(this, buf, error)
+        recursive subroutine pack_arr(this, buf, num, error)
             class(mp_arr_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
-            integer(kind=int64) :: length
+            integer(kind=int64) :: length, temp
             integer :: arrtype
             integer(kind=int64) :: writeindex
             integer(kind=int64) :: i
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -685,9 +693,8 @@ module messagepack_value
                 return
             end select
             do i = 1,length
-                call this%values(i)%obj%pack(buf(writeindex:), error)
-                call this%values(i)%obj%getsize(length)
-                writeindex = writeindex + length
+                call this%values(i)%obj%pack(buf(writeindex:), temp, error)
+                writeindex = writeindex + temp
                 if (error) then
                     return
                 end if
@@ -696,18 +703,19 @@ module messagepack_value
             error = .false.
         end subroutine
 
-        recursive subroutine pack_map(this, buf, error)
+        recursive subroutine pack_map(this, buf, num, error)
             class(mp_map_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
-            integer(kind=int64) :: length
+            integer(kind=int64) :: length, temp
             integer :: maptype
             integer(kind=int64) :: writeindex
             integer(kind=int64) :: i
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
@@ -731,33 +739,32 @@ module messagepack_value
                 return
             end select
             do i = 1,length
-                call this%keys(i)%obj%pack(buf(writeindex:), error)
+                call this%keys(i)%obj%pack(buf(writeindex:), temp, error)
                 if (error) then
                     return
                 end if
-                call this%keys(i)%obj%getsize(length)
-                writeindex = writeindex + length
-                call this%values(i)%obj%pack(buf(writeindex:), error)
+                writeindex = writeindex + temp
+                call this%values(i)%obj%pack(buf(writeindex:), temp, error)
                 if (error) then
                     return
                 end if
-                call this%values(i)%obj%getsize(length)
-                writeindex = writeindex + length
+                writeindex = writeindex + temp
             end do
 
             error = .false.
         end subroutine
 
-        subroutine pack_ext(this, buf, error)
+        subroutine pack_ext(this, buf, num, error)
             class(mp_ext_type) :: this
             byte, dimension(:) :: buf
+            integer(kind=int64), intent(out) :: num
             logical, intent(out) :: error
 
             ! check that the buffer can hold the required number of bytes
             integer(kind=int64) :: length
             integer(kind=int64) :: etype
-            call this%getsize(length)
-            if (length > size(buf)) then
+            call this%getsize(num)
+            if (num > size(buf)) then
                 error = .true.
                 return
             end if
