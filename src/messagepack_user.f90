@@ -64,6 +64,7 @@ module messagepack_user
         procedure :: pack_alloc
         procedure :: pack_prealloc
         procedure :: unpack
+        procedure :: unpack_buf
         procedure :: unpack_value
         procedure :: unpack_map
         procedure :: unpack_ext
@@ -260,6 +261,8 @@ module messagepack_user
         end subroutine
 
         subroutine unpack(this, buffer, mpv)
+            ! Unpack a MsgPack value from a buffer.
+            ! - nominally contains a single value
             ! @param[in] this - self
             ! @param[in] buffer - serialized messagepack data
             ! @param[out] mpv - Deserialized value
@@ -267,21 +270,43 @@ module messagepack_user
             byte, dimension(:), intent(in) :: buffer
             class(mp_value_type), allocatable, intent(out) :: mpv
 
-            integer(kind=int64) :: byteadvance
+            integer(kind=int64) :: numbytes
+
+            call this%unpack_buf(buffer, mpv, numbytes)
+            if (numbytes < size(buffer) .and. this%extra_bytes) then
+                ! configurable error
+                this%fail_flag = .true.
+                write(this%error_message, '(i0) (A)') size(buffer) - numbytes, ' extra bytes unused'
+            else if (numbytes > size(buffer)) then
+                this%fail_flag = .true. ! bug within reporting byte mechanism
+                write(this%error_message, '(A) (i0)') "internal error. number of bytes exceeds buffer size by: ", &
+                numbytes - size(buffer)
+            end if
+        end subroutine
+
+        subroutine unpack_buf(this, buffer, mpv, numbytes)
+            ! Unpack a single value from a buffer. Additionally returns
+            !   the number of bytes used, in case the buffer has multiple
+            !   MessagePack values within it or is a rolling buffer, etc.
+            ! @param[in] this - self
+            ! @param[in] buffer - serialized messagepack data
+            ! @param[out] mpv - Deserialized value
+            ! @param[out] numbytes - Number of bytes used in the buffer
+            class(msgpack) :: this
+            byte, dimension(:), intent(in) :: buffer
+            class(mp_value_type), allocatable, intent(out) :: mpv
+            integer(kind=int64), intent(out) :: numbytes
+
             logical :: successful
 
             this%fail_flag = .false.
-            call this%unpack_value(buffer, byteadvance, mpv, successful)
+            call this%unpack_value(buffer, numbytes, mpv, successful)
             this%fail_flag = .not.(successful)
 
-            if (byteadvance < size(buffer) .and. this%extra_bytes) then
-                ! configurable error
-                this%fail_flag = .true.
-                write(this%error_message, '(i0) (A)') size(buffer) - byteadvance, ' extra bytes unused'
-            else if (byteadvance > size(buffer)) then
+            if (numbytes > size(buffer)) then
                 this%fail_flag = .true. ! bug within reporting byte mechanism
                 write(this%error_message, '(A) (i0)') "internal error. number of bytes exceeds buffer size by: ", &
-                    byteadvance - size(buffer)
+                numbytes - size(buffer)
             end if
         end subroutine
 
