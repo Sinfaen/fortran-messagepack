@@ -19,12 +19,12 @@ program simple_demo
     call mp%extra_bytes_is_error(.true.)
 
     ! complicated example
-    mp_arr = mp_arr_type(3_int64)
+    mp_arr = mp_arr_type(3)
     mp_arr%values(1)%obj = mp_float_type(5.01)
     mp_arr%values(2)%obj = mp_float_type(-21.2)
     mp_arr%values(3)%obj = mp_float_type(700.0)
 
-    mp_bin = mp_bin_type(2_int64)
+    mp_bin = mp_bin_type(2)
     mp_bin%values(1) = -2
     mp_bin%values(2) = 35
 

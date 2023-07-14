@@ -60,7 +60,6 @@ module messagepack_value
     public :: new_real32, new_real64
     public :: set_unsigned, is_unsigned
     public :: get_bool, get_int, get_real, get_str, get_bin, get_arr_ref, get_map_ref, get_ext_ref
-    public :: get_header_size_by_type
 
     type, abstract :: mp_value_type
         ! nothing here
@@ -1159,35 +1158,5 @@ module messagepack_value
         integer(kind=int64) function get_ext_size(obj)
             class(mp_ext_type) :: obj
             get_ext_size = size(obj%values)
-        end function
-
-        integer function get_header_size_by_type(mp_type)
-            byte :: mp_type
-            select case(mp_type)
-            ! 1 byte header types
-            ! - all integers (except NFI PFI)
-            ! - both real types
-            ! - fixstr, fixarray, fixmap
-            case (MP_FM_L:MP_FS_H, MP_F32:MP_I64)
-                get_header_size_by_type = 1_int64
-            ! 2 byte header types
-            ! - bin8, str8
-            ! - fixext types
-            case (MP_B8, MP_S8, MP_FE1:MP_FE16)
-                get_header_size_by_type = 2_int64
-            ! 3 byte header types
-            case (MP_B16, MP_S16, MP_A16, MP_M16, MP_E8)
-                get_header_size_by_type = 3_int64
-            case (MP_E16)
-                get_header_size_by_type = 4_int64
-            ! 5 byte header types
-            case (MP_B32, MP_S32, MP_A32, MP_M32)
-                get_header_size_by_type = 5_int64
-            case (MP_E32)
-                get_header_size_by_type = 6_int64
-            case default
-                ! catches every other type
-                get_header_size_by_type = 0_int64
-            end select
         end function
 end module
