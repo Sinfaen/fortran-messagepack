@@ -70,6 +70,7 @@ module messagepack_user
         procedure :: unpack_ext
         procedure :: unpack_array
         procedure :: extra_bytes_is_error
+        procedure :: check_size
     end type
     interface msgpack
         procedure :: new_mp
@@ -209,17 +210,6 @@ module messagepack_user
 
             error = .false.
         end subroutine
-
-        logical function check_length_and_print(need, actual)
-            integer(kind=int64), intent(in) :: need
-            integer(kind=int64), intent(in) :: actual
-            if (actual < need) then
-                print *, "Not enough bytes for type"
-                check_length_and_print = .false.
-            else
-                check_length_and_print = .true.
-            end if
-        end function
 
         ! PACKING
         subroutine pack_alloc(this, mpv, buffer)
@@ -575,6 +565,138 @@ module messagepack_user
         end subroutine
 
         ! unpacking shenanigans
+        recursive subroutine check_size(this, buffer, recurse, &
+                byteadvance, error)
+            class(msgpack) :: this
+            byte, dimension(:), intent(in) :: buffer
+            logical, intent(in) :: recurse
+            integer(kind=int64), intent(out) :: byteadvance
+            logical, intent(out) :: error
+
+            ! temp variables
+            integer(kind=int64) :: length, i64_temp, i
+            byte :: i8_temp
+            integer(kind=int16) :: i16_temp
+            integer(kind=int32) :: i32_temp
+
+            ! set default output values
+            error = .false.
+            byteadvance = 1
+
+            ! need to have data available to read
+            length = size(buffer)
+            if (length == 0) then
+                error = .true.
+                this%error_message = 'buffer is empty'
+                return
+            end if
+
+            select case(buffer(1))
+            case (MP_PFI_L:MP_PFI_H, MP_NIL, MP_T, MP_F)
+                ! only a single byte is needed, all good
+            case (MP_U8, MP_I8)
+                byteadvance = 2
+            case (MP_U16, MP_I16, MP_FE1)
+                byteadvance = 3
+            case (MP_FE2)
+                byteadvance = 4
+            case (MP_U32, MP_I32, MP_F32)
+                byteadvance = 5
+            case (MP_FE4)
+                byteadvance = 6
+            case (MP_U64, MP_I64, MP_F64)
+                byteadvance = 9
+            case (MP_FE8)
+                byteadvance = 10
+            case (MP_FE16)
+                byteadvance = 18
+            ! dynamic length values
+            case (MP_FS_L:MP_FS_H)
+                ! length in first 5 bits
+                i8_temp = 0
+                call mvbits(buffer(1), 0, 5, i8_temp, 0) ! get fixstr length
+                byteadvance = 1_int64 + i8_temp
+            case (MP_S8, MP_B8)
+                ! length with 1 byte
+                i32_temp = int8_as_unsigned(buffer(2))
+                byteadvance = 1 + i32_temp
+            case (MP_S16, MP_B16)
+                ! length with 2 byte
+                i16_temp = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                byteadvance = 1 + i16_temp
+                if (length < 1 + byteadvance) then
+                    error = .true.
+                end if
+            case (MP_S32, MP_B32)
+                ! length with 4 byte
+                i32_temp = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                byteadvance = 1 + i32_temp
+                if (length < 1 + i32_temp) then
+                    error = .true.
+                end if
+            ! containers
+            case (MP_FA_L:MP_FA_H, MP_FM_L:MP_FM_H)
+                ! length with first 4 bits
+                i8_temp = 0
+                call mvbits(buffer(1), 0, 4, i8_temp, 0) ! get fixarr, fixmap length
+                ! recurse
+                if (recurse) then
+                    do i = 1,i8_temp
+                        call this%check_size(buffer(byteadvance+1:), recurse, &
+                            i64_temp, error)
+                        if (error) then
+                            return
+                        end if
+                        byteadvance = byteadvance + i64_temp
+                    end do
+                end if
+            case (MP_A16, MP_M16)
+                ! length with 2 byte
+                byteadvance = 3
+                if (length < byteadvance) then
+                    error = .true.
+                    return
+                end if
+                i16_temp = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
+                ! recurse
+                if (recurse) then
+                    do i = 1,i16_temp
+                        call this%check_size(buffer(byteadvance+1:), recurse, &
+                            i64_temp, error)
+                        if (error) then
+                            return
+                        end if
+                        byteadvance = byteadvance + i64_temp
+                    end do
+                end if
+            case (MP_A32, MP_M32)
+                ! length with 4 byte
+                byteadvance = 5
+                if (length < byteadvance) then
+                    error = .true.
+                    return
+                end if
+                i32_temp = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
+                ! recurse
+                if (recurse) then
+                    do i = 1,i32_temp
+                        call this%check_size(buffer(byteadvance+1:), recurse, &
+                            i64_temp, error)
+                        if (error) then
+                            return
+                        end if
+                        byteadvance = byteadvance + i64_temp
+                    end do
+                end if
+            end select
+            if (length < byteadvance) then
+                error = .false.
+            end if
+            if (error) then
+                this%error_message = 'not enough bytes'
+            end if
+        end subroutine
+            
         recursive subroutine unpack_value(this, buffer, byteadvance, &
                 mpv, successful)
             class(msgpack) :: this
@@ -592,8 +714,10 @@ module messagepack_user
             integer(kind=int32) :: val_int32
             integer(kind=int64) :: val_int64
 
-            integer(kind=int64) :: header_size
+            integer(kind=int64) :: i64_temp
             character(:), allocatable :: val_char
+
+            logical :: error
 
             length = size(buffer)
 
@@ -608,10 +732,10 @@ module messagepack_user
             end if
 
             ! check that the size for the entire header exists
-            header_size = get_header_size_by_type(buffer(1))
-            if (.not. check_length_and_print(header_size, length)) then
+            call this%check_size(buffer, .true., i64_temp, error)
+            if (error) then
                 successful = .false.
-                this%error_message = 'buffer too small for header'
+                this%error_message = 'insufficient size'
                 return
             end if
 
@@ -624,33 +748,18 @@ module messagepack_user
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixmap length
                 val_int64 = btemp1
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixmap - insufficient size for header'
-                    return
-                end if
                 byteadvance = 1
                 call this%unpack_map(val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_FA_L:MP_FA_H)
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 4, btemp1, 0) ! get fixarray length
-                if (.not. check_length_and_print(1_int64 + btemp1, length)) then
-                    successful = .false.
-                    this%error_message = 'fixarr - insufficient size for header'
-                    return
-                end if
                 byteadvance = 1
                 call this%unpack_array(btemp1 + 0_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_FS_L:MP_FS_H)
                 btemp1 = 0
                 call mvbits(buffer(1), 0, 5, btemp1, 0) ! get fixstr length
-                if (.not. check_length_and_print(1_int64 + btemp1, length)) then
-                    successful = .false.
-                    this%error_message = 'fixstr - insufficient size for header'
-                    return
-                end if
                 allocate(character(btemp1) :: val_char)
                 do i = 1,btemp1
                     val_char(i:i) = transfer(buffer(1 + i), 'a')
@@ -669,14 +778,8 @@ module messagepack_user
                 mpv = mp_bool_type(.true.)
             ! binary format family
             case (MP_B8)
-                ! check that the remaining number of bytes exist
                 val_int32 = int8_as_unsigned(buffer(2))
                 val_int64 = val_int32
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'bin8 - insufficient size'
-                    return
-                end if
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
@@ -688,14 +791,8 @@ module messagepack_user
                 end select
                 byteadvance = 2 + val_int64
             case (MP_B16)
-                ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 val_int64 = int16_as_unsigned(val_int16)
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'bin16 - insufficient size'
-                    return
-                end if
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
@@ -707,14 +804,8 @@ module messagepack_user
                 end select
                 byteadvance = 3 + val_int64
             case (MP_B32)
-                ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'bin32 - insufficient size'
-                    return
-                end if
                 mpv = mp_bin_type(val_int64)
                 ! copy data
                 select type (mpv)
@@ -727,22 +818,12 @@ module messagepack_user
                 byteadvance = 5 + val_int64
             case (MP_E8)
                 ! check for first 3 bytes
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'ext8 - insufficient size'
-                    return
-                end if
                 i = buffer(3)
                 byteadvance = 3
                 call this%unpack_ext(int8_as_unsigned(buffer(2)) + 0_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_E16)
                 ! check for first 4 bytes
-                if (.not. check_length_and_print(4_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'ext16 - insufficient size'
-                    return
-                end if
                 i = buffer(4)
                 byteadvance = 4
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
@@ -750,11 +831,6 @@ module messagepack_user
                     i, buffer, byteadvance, mpv, successful)
             case (MP_E32)
                 ! check for first 6 bytes
-                if (.not. check_length_and_print(6_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'ext32 - insufficient size'
-                    return
-                end if
                 i = buffer(6)
                 byteadvance = 6
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
@@ -762,61 +838,31 @@ module messagepack_user
                     i, buffer, byteadvance, mpv, successful)
             case (MP_F32)
                 ! 4 bytes following
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'float32 - insufficient size'
-                    return
-                end if
                 mpv = new_real32(bytes_be_to_real_4(buffer(2:5), &
                     this%is_little_endian))
                 byteadvance = 5
             case (MP_F64)
                 ! 8 bytes following
-                if (.not. check_length_and_print(9_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'float64 - insufficient size'
-                    return
-                end if
                 mpv = new_real64(bytes_be_to_real_8(buffer(2:9), this%is_little_endian))
                 byteadvance = 9
             ! Unsigned integers >>>
             ! need to watch when grabbed values are negative
             case (MP_U8)
                 ! 1 byte following
-                if (.not. check_length_and_print(2_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'uint8 - insufficient size'
-                    return
-                end if
                 mpv = mp_int_type(int8_as_unsigned(buffer(2)))
                 byteadvance = 2
             case (MP_U16)
                 ! 2 bytes following
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'uint16 - insufficient size'
-                    return
-                end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 mpv = mp_int_type(int16_as_unsigned(val_int16))
                 byteadvance = 3
             case (MP_U32)
                 ! 4 bytes following
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'uint32 - insufficient size'
-                    return
-                end if
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
                 mpv = mp_int_type(int32_as_unsigned(val_int32))
                 byteadvance = 5
             case (MP_U64)
                 ! 8 bytes following
-                if (.not. check_length_and_print(9_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'uint64 - insufficient size'
-                    return
-                end if
                 val_int64 = bytes_be_to_int_8(buffer(2:9), this%is_little_endian)
                 if (val_int64 >= 0) then
                     mpv = mp_int_type(val_int64)
@@ -828,106 +874,55 @@ module messagepack_user
             ! Signed integers >>>
             case (MP_I8)
                 ! 1 byte following
-                if (.not. check_length_and_print(2_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'int8 - insufficient size'
-                    return
-                end if
                 mpv = mp_int_type(buffer(2))
                 byteadvance = 2
             case (MP_I16)
                 ! 2 bytes following
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'int16 - insufficient size'
-                    return
-                end if
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
                 mpv = mp_int_type(val_int32)
                 byteadvance = 3
             case (MP_I32)
                 ! 4 bytes following
-                if (.not. check_length_and_print(5_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'int32 - insufficient size'
-                    return
-                end if
                 mpv = mp_int_type(bytes_be_to_int_4(buffer(2:5), this%is_little_endian))
                 byteadvance = 5
             case (MP_I64)
                 ! 8 bytes following
-                if (.not. check_length_and_print(9_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'int64 - insufficient size'
-                    return
-                end if
                 mpv = mp_int_type(bytes_be_to_int_8(buffer(2:9), this%is_little_endian))
                 byteadvance = 9
             ! ext format family
             case (MP_FE1)
                 ! 3 bytes following
-                if (.not. check_length_and_print(3_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixext1 - insufficient size'
-                    return
-                end if
                 i = buffer(2)
                 byteadvance = 2
                 call this%unpack_ext(1_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE2)
                 ! 4 bytes following
-                if (.not. check_length_and_print(4_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixext2 - insufficient size'
-                    return
-                end if
                 i = buffer(2)
                 byteadvance = 2
                 call this%unpack_ext(2_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE4)
                 ! 6 bytes following
-                if (.not. check_length_and_print(6_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixext4 - insufficient size'
-                    return
-                end if
                 i = buffer(2)
                 byteadvance = 2
                 call this%unpack_ext(4_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE8)
                 ! 8 bytes following
-                if (.not. check_length_and_print(8_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixext8 - insufficient size'
-                    return
-                end if
                 i = buffer(2)
                 byteadvance = 2
                 call this%unpack_ext(8_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_FE16)
                 ! 18 bytes following
-                if (.not. check_length_and_print(18_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'fixext16 - insufficient size'
-                    return
-                end if
                 i = buffer(2)
                 byteadvance = 2
                 call this%unpack_ext(16_int64, &
                     i, buffer, byteadvance, mpv, successful)
             case (MP_S8)
-                ! check that the remaining number of bytes exist
                 val_int16 = int8_as_unsigned(buffer(2))
-                if (.not. check_length_and_print(2_int64 + val_int16, length)) then
-                    successful = .false.
-                    this%error_message = 'str8 - insufficient size'
-                    return
-                end if
                 ! create string
                 allocate(character(val_int16) :: val_char)
                 do i = 1,val_int16
@@ -936,14 +931,8 @@ module messagepack_user
                 mpv = mp_str_type(val_char)
                 byteadvance = 1 + val_int16
             case (MP_S16)
-                ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
-                if (.not. check_length_and_print(3_int64 + val_int32, length)) then
-                    successful = .false.
-                    this%error_message = 'str16 - insufficient size'
-                    return
-                end if
                 ! create string
                 allocate(character(val_int32) :: val_char)
                 do i = 1,val_int32
@@ -952,14 +941,8 @@ module messagepack_user
                 mpv = mp_str_type(val_char)
                 byteadvance = 1 + val_int32
             case (MP_S32)
-                ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
-                if (5 + val_int64 > length) then
-                    successful = .false.
-                    this%error_message = 'str32 - insufficient size'
-                    return
-                end if
                 ! create string
                 allocate(character(val_int64) :: val_char)
                 do i_64 = 1_int64,val_int64
@@ -968,50 +951,26 @@ module messagepack_user
                 mpv = mp_str_type(val_char)
                 byteadvance = 1_int64 + val_int64
             case (MP_A16)
-                ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
-                if (.not. check_length_and_print(1_int64 + val_int32, length)) then
-                    successful = .false.
-                    this%error_message = 'arr16 - insufficient size'
-                    return
-                end if
                 byteadvance = 3
                 call this%unpack_array(int(val_int32, kind=int64), &
                     buffer, byteadvance, mpv, successful)
             case (MP_A32)
-                ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'arr32 - insufficient size'
-                    return
-                end if
                 byteadvance = 5
                 call this%unpack_array(val_int64, buffer, byteadvance, &
                     mpv, successful)
             case (MP_M16)
-                ! check that the remaining number of bytes exist
                 val_int16 = bytes_be_to_int_2(buffer(2:3), this%is_little_endian)
                 val_int32 = int16_as_unsigned(val_int16)
-                if (.not. check_length_and_print(1_int64 + val_int32, length)) then
-                    successful = .false.
-                    this%error_message = 'map16 - insufficient size'
-                    return
-                end if
                 byteadvance = 3
                 call this%unpack_map(0_int64 + val_int32, buffer, byteadvance, &
                     mpv, successful)
             case (MP_M32)
-                ! check that the remaining number of bytes exist
                 val_int32 = bytes_be_to_int_4(buffer(2:5), this%is_little_endian)
                 val_int64 = int32_as_unsigned(val_int32)
-                if (.not. check_length_and_print(1 + val_int64, length)) then
-                    successful = .false.
-                    this%error_message = 'map32 - insufficient size'
-                    return
-                end if
                 byteadvance = 5
                 call this%unpack_map(val_int64, buffer, byteadvance, &
                     mpv, successful)
