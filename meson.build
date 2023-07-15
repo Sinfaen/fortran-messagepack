@@ -31,3 +31,6 @@ test('roundtrip', e4)
 simple_demo = executable('simple-demo',
     'app/simple-demo/main.f90',
     dependencies : [my_dep])
+unpack_demo = executable('unpack-buffer',
+    'app/unpack-buffer/main.f90',
+    dependencies : [my_dep])

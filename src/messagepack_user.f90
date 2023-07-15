@@ -65,6 +65,7 @@ module messagepack_user
         procedure :: pack_prealloc
         procedure :: unpack
         procedure :: unpack_buf
+        procedure :: is_available
         procedure :: unpack_value
         procedure :: unpack_map
         procedure :: unpack_ext
@@ -299,6 +300,22 @@ module messagepack_user
                 numbytes - size(buffer)
             end if
         end subroutine
+
+        logical function is_available(this, buffer)
+            ! Returns true if the buffer contains at least 1 complete
+            ! messagepack value
+            ! @param[in] this - instance
+            ! @param[in] buffer - serialized data
+            ! @returns - .true. if a complete messagepack value exists
+            class(msgpack) :: this
+            byte, dimension(:) :: buffer
+
+            logical :: error
+            integer(kind=int64) :: numbytes
+
+            call this%check_size(buffer, .true., numbytes, error)
+            is_available = .not.(error)
+        end function
 
         subroutine print_value(this, obj)
             ! Prints MessagePack object with default options
