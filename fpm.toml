@@ -1,5 +1,5 @@
 name = "fortran_messagepack"
-version = "0.3.0"
+version = "0.3.1"
 license="MIT"
 author="Kelly Schultz"
 maintainer="ksjaculus@gmail.com"

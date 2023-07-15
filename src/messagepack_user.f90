@@ -138,7 +138,7 @@ module messagepack_user
 
         subroutine print_version(this)
             class(msgpack) :: this
-            print *, "0.3.0"
+            print *, "0.3.1"
         end subroutine
 
         logical function failed(this)
