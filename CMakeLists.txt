@@ -6,6 +6,7 @@ project(fortran_messagepack
 
 add_subdirectory(src)
 add_subdirectory(app/simple-demo)
+add_subdirectory(app/unpack-buffer)
 add_subdirectory(test)
 enable_testing()
 

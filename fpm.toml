@@ -11,6 +11,11 @@ name = "simple-demo"
 source-dir = "app/simple-demo"
 main = "main.f90"
 
+[[executable]]
+name = "unpack-demo"
+source-dir = "app/unpack-buffer"
+main = "main.f90"
+
 [[test]]
 name = "constructors"
 source-dir = "test"
